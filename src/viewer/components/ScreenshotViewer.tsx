@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { VisualCapture } from '@/shared/types';
 
 interface ScreenshotViewerProps {
@@ -8,18 +7,16 @@ interface ScreenshotViewerProps {
 }
 
 export default function ScreenshotViewer({ visual, stepNumber, totalSteps }: ScreenshotViewerProps) {
-  const [isZoomed, setIsZoomed] = useState(false);
-
   // Get the screenshot (prioritize viewport, then thumbnail)
   const screenshot = visual?.viewport || visual?.thumbnail;
 
   if (!screenshot) {
     return (
-      <div className="bg-gray-100 rounded-lg flex items-center justify-center h-[500px]">
-        <div className="text-center">
-          <div className="text-6xl mb-4">📷</div>
-          <p className="text-gray-600 font-medium">No screenshot available</p>
-          <p className="text-sm text-gray-500 mt-2">
+      <div className="bg-white rounded-2xl flex items-center justify-center min-h-[500px] shadow-sm border border-gray-100">
+        <div className="text-center px-8">
+          <div className="text-6xl mb-6 opacity-40">📷</div>
+          <p className="text-gray-900 font-medium text-lg mb-2">No screenshot available</p>
+          <p className="text-sm text-gray-500 leading-relaxed max-w-md">
             Screenshots are captured for click, submit, and navigation events
           </p>
         </div>
@@ -28,40 +25,27 @@ export default function ScreenshotViewer({ visual, stepNumber, totalSteps }: Scr
   }
 
   return (
-    <div className="space-y-4">
-      {/* Screenshot Display */}
-      <div className="relative">
-        {/* Step Counter */}
-        <div className="absolute top-4 right-4 z-10 bg-black bg-opacity-60 text-white px-4 py-2 rounded-lg shadow-lg">
-          <span className="text-lg font-semibold">
-            {stepNumber} / {totalSteps}
-          </span>
-        </div>
-
-        {/* Zoom Hint */}
-        {!isZoomed && (
-          <div className="absolute bottom-4 left-4 z-10 bg-black bg-opacity-60 text-white px-3 py-1 rounded text-sm">
-            Click to zoom
-          </div>
-        )}
-
-        {/* Screenshot Container */}
-        <div className="min-h-[500px] bg-gray-900 rounded-lg overflow-auto shadow-lg flex items-start justify-center p-4">
-          <img
-            src={screenshot}
-            alt="Screenshot"
-            className={`w-full object-contain transition-transform duration-200 ${
-              isZoomed ? 'cursor-zoom-out scale-150' : 'cursor-zoom-in'
-            }`}
-            onClick={() => setIsZoomed(!isZoomed)}
-            style={{ imageRendering: 'crisp-edges' }}
-          />
+    <div className="space-y-3">
+      {/* Step Counter - Minimal and Subtle */}
+      <div className="flex items-center justify-between px-1">
+        <div className="text-sm font-medium text-gray-400">
+          Step {stepNumber} of {totalSteps}
         </div>
       </div>
 
-      {/* Screenshot Info */}
-      <div className="text-center text-sm text-gray-500">
-        <p>Screenshot captured after the interaction completed</p>
+      {/* Screenshot Container - Clean and Minimal */}
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <div className="p-6">
+          <img
+            src={screenshot}
+            alt={`Step ${stepNumber} screenshot`}
+            className="w-full rounded-lg"
+            style={{
+              imageRendering: 'crisp-edges',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
+            }}
+          />
+        </div>
       </div>
     </div>
   );

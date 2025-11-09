@@ -54,57 +54,52 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-6 py-5 flex items-center justify-between hover:bg-gray-50 transition-all duration-200 rounded-2xl"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <span className="text-2xl">{getStepIcon(step.type)}</span>
           <div className="text-left">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">Step {stepNumber}</span>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-gray-900 text-base">Step {stepNumber}</span>
               <span
-                className={`px-2 py-1 text-xs font-medium rounded border ${getStepColor(
+                className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getStepColor(
                   step.type
                 )}`}
               >
                 {step.type}
               </span>
             </div>
-            <p className="text-sm text-gray-600 mt-1">{formatTime(step.timestamp)}</p>
+            <p className="text-sm text-gray-500 mt-1.5">{formatTime(step.timestamp)}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">
-            {isExpanded ? 'Hide' : 'Show'} Details
-          </span>
-          <svg
-            className={`w-5 h-5 text-gray-400 transition-transform ${
-              isExpanded ? 'transform rotate-180' : ''
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </div>
+        <svg
+          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+            isExpanded ? 'transform rotate-180' : ''
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
       </button>
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="px-6 pb-6 space-y-4 border-t border-gray-200">
+        <div className="px-6 pb-6 space-y-5 border-t border-gray-100">
           {/* Selector */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Selector</h3>
-            <div className="bg-gray-50 rounded p-3 font-mono text-sm text-gray-800 break-all">
+          <div className="pt-5">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Selector</h3>
+            <div className="bg-gray-50 rounded-xl p-4 font-mono text-sm text-gray-800 break-all">
               {step.selector}
             </div>
           </div>
@@ -112,20 +107,20 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
           {/* Alternative Selectors */}
           {step.alternativeSelectors && step.alternativeSelectors.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">
                 Alternative Selectors ({step.alternativeSelectors.length})
               </h3>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {step.alternativeSelectors.slice(0, 3).map((selector, idx) => (
                   <div
                     key={idx}
-                    className="bg-gray-50 rounded p-2 font-mono text-xs text-gray-700 break-all"
+                    className="bg-gray-50 rounded-xl p-3 font-mono text-xs text-gray-700 break-all"
                   >
                     {selector}
                   </div>
                 ))}
                 {step.alternativeSelectors.length > 3 && (
-                  <p className="text-xs text-gray-500 text-center">
+                  <p className="text-xs text-gray-500 text-center mt-2">
                     +{step.alternativeSelectors.length - 3} more
                   </p>
                 )}
@@ -136,8 +131,8 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
           {/* Value */}
           {step.value !== null && step.value !== undefined && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Value</h3>
-              <div className="bg-gray-50 rounded p-3 text-sm text-gray-800">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Value</h3>
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-800">
                 {typeof step.value === 'boolean'
                   ? step.value
                     ? 'true'
@@ -150,8 +145,8 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
           {/* URL */}
           {step.url && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">URL</h3>
-              <div className="bg-gray-50 rounded p-3 text-sm text-blue-600 break-all">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">URL</h3>
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-blue-600 break-all">
                 {step.url}
               </div>
             </div>
@@ -160,16 +155,16 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
           {/* Element Context */}
           {step.elementContext && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Element Context</h3>
-              <div className="bg-gray-50 rounded p-3 space-y-2 text-sm">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Element Context</h3>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
                 <div>
-                  <span className="font-medium">Tag:</span>{' '}
+                  <span className="font-medium text-gray-600">Tag:</span>{' '}
                   <code className="text-purple-600">&lt;{step.elementContext.tagName}&gt;</code>
                 </div>
                 {step.elementContext.textContent && (
                   <div>
-                    <span className="font-medium">Text:</span>{' '}
-                    <span className="text-gray-700">"{step.elementContext.textContent}"</span>
+                    <span className="font-medium text-gray-600">Text:</span>{' '}
+                    <span className="text-gray-800">"{step.elementContext.textContent}"</span>
                   </div>
                 )}
               </div>
@@ -179,8 +174,8 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
           {/* Metadata */}
           {step.metadata && Object.keys(step.metadata).length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Metadata</h3>
-              <div className="bg-gray-50 rounded p-3 space-y-1 text-xs font-mono max-h-48 overflow-y-auto">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Metadata</h3>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-xs font-mono max-h-48 overflow-y-auto">
                 {Object.entries(step.metadata).map(([key, value]) => (
                   <div key={key} className="text-gray-700">
                     <span className="text-blue-600">{key}:</span>{' '}
@@ -195,8 +190,8 @@ export default function StepDetailsPanel({ step, stepNumber }: StepDetailsPanelP
 
           {/* Timestamp */}
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Timestamp</h3>
-            <div className="bg-gray-50 rounded p-3 text-sm text-gray-800">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Timestamp</h3>
+            <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-800">
               {formatDate(step.timestamp)}
             </div>
           </div>

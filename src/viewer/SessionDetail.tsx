@@ -121,41 +121,40 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <button
             onClick={onBack}
-            className="mb-4 px-4 py-2 text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2 hover:gap-3 transition-all"
+            className="mb-6 px-4 py-2 text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2 hover:gap-3 transition-all duration-200"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
-            <span>Back to Sessions</span>
+            <span>Back</span>
           </button>
 
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{session.metadata.title}</h1>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-3 tracking-tight">{session.metadata.title}</h1>
             {session.metadata.description && (
-              <p className="text-gray-600 mb-4">{session.metadata.description}</p>
+              <p className="text-gray-600 text-lg mb-6 leading-relaxed">{session.metadata.description}</p>
             )}
-            <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-              <div>
-                <span className="font-medium">Total Steps:</span> {session.steps.length}
+            <div className="flex flex-wrap gap-6 text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-900">{session.steps.length}</span>
+                <span>steps</span>
               </div>
-              <div>
-                <span className="font-medium">Created:</span> {formatDate(session.createdAt)}
-              </div>
-              <div>
-                <span className="font-medium">Updated:</span> {formatDate(session.updatedAt)}
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">•</span>
+                <span>{formatDate(session.createdAt)}</span>
               </div>
             </div>
             {session.metadata.tags && session.metadata.tags.length > 0 && (
-              <div className="mt-4 flex gap-2">
+              <div className="mt-5 flex gap-2">
                 {session.metadata.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                    className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-full font-medium"
                   >
                     {tag}
                   </span>
