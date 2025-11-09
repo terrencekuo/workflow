@@ -51,10 +51,13 @@ export class RecorderController {
     });
 
     // Track when tabs are updated (URL changes)
-    chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+    chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
         console.log('[RecorderController] Tab updated:', tabId, changeInfo);
         await this.ensureContentScriptLoaded(tabId);
+
+        // Capture the final loaded state after navigation
+        await this.capturePageLoadStep(tabId, tab.url || '');
       }
     });
 
@@ -659,8 +662,66 @@ export class RecorderController {
       EVENT_TYPES.CLICK,
       EVENT_TYPES.SUBMIT,
       EVENT_TYPES.NAVIGATION,
+      EVENT_TYPES.PAGE_LOAD,
     ];
     return visualEvents.includes(stepType as any);
+  }
+
+  /**
+   * Capture a pageLoad step when navigation completes
+   * This ensures we get the final state of the loaded page
+   */
+  private async capturePageLoadStep(tabId: number, url: string): Promise<void> {
+    if (!this.isRecording || !this.currentSessionId) {
+      return;
+    }
+
+    try {
+      console.log('[RecorderController] Capturing page load for:', url);
+
+      // Wait for page to be ready with smart detection
+      const readinessState = await this.waitForPageReadiness(tabId);
+
+      console.log(
+        `[RecorderController] Page load ready: ${readinessState.reason} (${readinessState.duration}ms)`,
+        readinessState.checks
+      );
+
+      // Capture screenshot of the loaded page
+      const screenshot = await this.visualCaptureService.captureTabScreenshot(tabId);
+
+      // Create page load step
+      const step: RecordedStep = {
+        id: crypto.randomUUID(),
+        sessionId: this.currentSessionId,
+        type: EVENT_TYPES.PAGE_LOAD,
+        selector: 'window',
+        value: url,
+        url: url,
+        timestamp: Date.now(),
+        metadata: {
+          type: 'pageLoad',
+          url: url,
+          pageReadiness: readinessState,
+        },
+      };
+
+      if (screenshot) {
+        step.visual = {
+          viewport: screenshot,
+          thumbnail: screenshot,
+        };
+      }
+
+      // Save to database
+      await db.addStep(this.currentSessionId, step);
+      this.stepCount++;
+      await this.saveState();
+
+      console.log('[RecorderController] Page load step recorded:', url);
+    } catch (error) {
+      console.error('[RecorderController] Error capturing page load step:', error);
+    }
   }
 
   /**

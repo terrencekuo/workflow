@@ -83,7 +83,8 @@ export class Recorder {
     this.addListener(document, 'submit', this.handleSubmit.bind(this), true);
 
     // Navigation
-    this.addListener(window, 'beforeunload', this.handleBeforeUnload.bind(this));
+    // beforeunload disabled - causes duplicate screenshots during navigation
+    // this.addListener(window, 'beforeunload', this.handleBeforeUnload.bind(this));
     this.addListener(window, 'popstate', this.handleNavigation.bind(this));
 
     // Scroll events
@@ -415,20 +416,20 @@ export class Recorder {
   }
 
   /**
-   * Handle before unload events
+   * Handle before unload events - DISABLED: Causes duplicate screenshots
    */
-  private handleBeforeUnload(): void {
-    this.recordStep({
-      type: EVENT_TYPES.NAVIGATION,
-      selector: 'window',
-      value: 'unload',
-      timestamp: Date.now(),
-      metadata: {
-        type: 'unload',
-        url: window.location.href,
-      },
-    });
-  }
+  // private handleBeforeUnload(): void {
+  //   this.recordStep({
+  //     type: EVENT_TYPES.NAVIGATION,
+  //     selector: 'window',
+  //     value: 'unload',
+  //     timestamp: Date.now(),
+  //     metadata: {
+  //       type: 'unload',
+  //       url: window.location.href,
+  //     },
+  //   });
+  // }
 
   /**
    * Record a step and send to background
