@@ -160,7 +160,7 @@ export class RecorderController {
 
   /**
    * Handle record step command from content script
-   * Captures ONE screenshot after the event with appropriate delay
+   * Captures ONE screenshot after the event with smart detection
    */
   private async handleRecordStep(
     step: RecordedStep
@@ -173,14 +173,16 @@ export class RecorderController {
       // Ensure step has session ID
       step.sessionId = this.currentSessionId;
 
-      // Capture screenshot for major events AFTER the event with delay
+      // Capture screenshot for major events AFTER the event with smart detection
       if (this.shouldCaptureVisual(step.type) && this.currentTabId) {
         try {
-          // Wait for page changes to settle based on event type
-          const delay = this.getScreenshotDelay(step.type);
-          if (delay > 0) {
-            await this.sleep(delay);
-          }
+          // Use smart detection to wait for page readiness
+          const readinessState = await this.waitForPageReadiness(this.currentTabId);
+
+          console.log(
+            `[RecorderController] Page ready for screenshot: ${readinessState.reason} (${readinessState.duration}ms)`,
+            readinessState.checks
+          );
 
           // Capture ONE screenshot
           const screenshot = await this.visualCaptureService.captureTabScreenshot(
@@ -192,6 +194,13 @@ export class RecorderController {
               viewport: screenshot,
               thumbnail: screenshot, // No thumbnail generation for now
             };
+
+            // Store readiness info in metadata for debugging
+            if (!step.metadata) {
+              step.metadata = {};
+            }
+            step.metadata.pageReadiness = readinessState;
+
             console.log('[RecorderController] Captured screenshot for step:', step.type);
           }
         } catch (error) {
@@ -219,30 +228,273 @@ export class RecorderController {
   }
 
   /**
-   * Get appropriate delay before taking screenshot based on event type
+   * Wait for page to be ready using smart detection
+   * Injects PageLoadDetector into the content page and waits for result
    */
-  private getScreenshotDelay(stepType: string): number {
-    // Navigation events need more time to load
-    if (stepType === EVENT_TYPES.NAVIGATION) {
-      return 1500; // 1.5 seconds for page loads
-    }
-    // Form submissions that might trigger navigation
-    if (stepType === EVENT_TYPES.SUBMIT) {
-      return 1000; // 1 second for form submissions
-    }
-    // Click events that might trigger dynamic content
-    if (stepType === EVENT_TYPES.CLICK) {
-      return 500; // 0.5 seconds for clicks
-    }
-    // Default - no delay for other events
-    return 0;
-  }
+  private async waitForPageReadiness(tabId: number): Promise<any> {
+    try {
+      // Inject and execute the detection script
+      const result = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: async () => {
+          // Inline PageLoadDetector for injection
+          interface PageReadinessState {
+            isReady: boolean;
+            reason: string;
+            duration: number;
+            checks: {
+              domStable: boolean;
+              resourcesLoaded: boolean;
+              noSkeletons: boolean;
+            };
+          }
 
-  /**
-   * Sleep utility
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+          class PageLoadDetector {
+            private maxTimeout: number;
+            private domStabilityWait: number;
+            private mutationTimeout: number | null = null;
+            private lastMutationTime: number = 0;
+
+            constructor(maxTimeout = 3000, domStabilityWait = 300) {
+              this.maxTimeout = maxTimeout;
+              this.domStabilityWait = domStabilityWait;
+            }
+
+            async waitForPageReady(): Promise<PageReadinessState> {
+              const startTime = Date.now();
+              const timeoutPromise = this.createTimeout();
+
+              try {
+                const result = await Promise.race([
+                  this.performAllChecks(startTime),
+                  timeoutPromise,
+                ]);
+                return { ...result, duration: Date.now() - startTime };
+              } catch (error) {
+                return {
+                  isReady: false,
+                  reason: 'Detection error: ' + (error instanceof Error ? error.message : 'Unknown'),
+                  duration: Date.now() - startTime,
+                  checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+                };
+              }
+            }
+
+            private async performAllChecks(startTime: number): Promise<PageReadinessState> {
+              const checks = { domStable: false, resourcesLoaded: false, noSkeletons: false };
+
+              await this.waitForDOMStability();
+              checks.domStable = true;
+
+              if (Date.now() - startTime >= this.maxTimeout) {
+                return { isReady: false, reason: 'Timeout after DOM stability', duration: Date.now() - startTime, checks };
+              }
+
+              await this.waitForResources();
+              checks.resourcesLoaded = true;
+
+              if (Date.now() - startTime >= this.maxTimeout) {
+                return { isReady: true, reason: 'Resources loaded (timeout before skeleton check)', duration: Date.now() - startTime, checks };
+              }
+
+              await this.waitForSkeletonDisappear();
+              checks.noSkeletons = true;
+
+              return { isReady: true, reason: 'All checks passed', duration: Date.now() - startTime, checks };
+            }
+
+            private createTimeout(): Promise<PageReadinessState> {
+              return new Promise((resolve) => {
+                setTimeout(() => {
+                  resolve({
+                    isReady: true,
+                    reason: 'Max timeout reached',
+                    duration: this.maxTimeout,
+                    checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+                  });
+                }, this.maxTimeout);
+              });
+            }
+
+            private waitForDOMStability(): Promise<void> {
+              return new Promise((resolve) => {
+                let mutationCount = 0;
+                this.lastMutationTime = Date.now();
+
+                const observer = new MutationObserver(() => {
+                  mutationCount++;
+                  this.lastMutationTime = Date.now();
+
+                  if (this.mutationTimeout) clearTimeout(this.mutationTimeout);
+
+                  this.mutationTimeout = window.setTimeout(() => {
+                    observer.disconnect();
+                    resolve();
+                  }, this.domStabilityWait);
+                });
+
+                observer.observe(document.body || document.documentElement, {
+                  childList: true,
+                  subtree: true,
+                  attributes: true,
+                  characterData: true,
+                });
+
+                setTimeout(() => {
+                  if (Date.now() - this.lastMutationTime >= this.domStabilityWait) {
+                    observer.disconnect();
+                    if (this.mutationTimeout) clearTimeout(this.mutationTimeout);
+                    resolve();
+                  }
+                }, this.domStabilityWait);
+              });
+            }
+
+            private async waitForResources(): Promise<void> {
+              const resources: HTMLElement[] = [
+                ...Array.from(document.querySelectorAll('img')),
+                ...Array.from(document.querySelectorAll('iframe')),
+                ...Array.from(document.querySelectorAll('video')),
+              ];
+
+              if (resources.length === 0) return;
+
+              const promises: Promise<void>[] = [];
+
+              for (const resource of resources) {
+                if (resource instanceof HTMLImageElement) {
+                  if (resource.complete && resource.naturalHeight > 0) continue;
+                } else if (resource instanceof HTMLIFrameElement) {
+                  try {
+                    if (resource.contentDocument?.readyState === 'complete') continue;
+                  } catch (e) {
+                    continue;
+                  }
+                } else if (resource instanceof HTMLVideoElement) {
+                  if (resource.readyState >= 2) continue;
+                }
+
+                promises.push(
+                  new Promise<void>((resolve) => {
+                    const timeout = setTimeout(() => resolve(), 2000);
+                    const onLoad = () => {
+                      clearTimeout(timeout);
+                      resolve();
+                    };
+                    resource.addEventListener('load', onLoad, { once: true });
+                    resource.addEventListener('error', onLoad, { once: true });
+                  })
+                );
+              }
+
+              await Promise.all(promises);
+            }
+
+            private async waitForSkeletonDisappear(): Promise<void> {
+              const maxWait = 1500;
+              const checkInterval = 100;
+              const startTime = Date.now();
+
+              return new Promise((resolve) => {
+                const checkSkeletons = () => {
+                  const hasSkeletons = this.hasSkeletonElements();
+
+                  if (!hasSkeletons || Date.now() - startTime >= maxWait) {
+                    resolve();
+                    return;
+                  }
+
+                  setTimeout(checkSkeletons, checkInterval);
+                };
+
+                checkSkeletons();
+              });
+            }
+
+            private hasSkeletonElements(): boolean {
+              const patterns = [
+                'skeleton', 'loading', 'shimmer', 'placeholder-glow', 'placeholder-wave',
+                'content-loader', 'skeleton-loader', 'loading-skeleton', 'pulse', 'animate-pulse',
+                'spinner', 'loader', 'loading-spinner', 'spin', 'rotating',
+              ];
+
+              for (const pattern of patterns) {
+                const elements = document.querySelectorAll(`[class*="${pattern}" i], [data-loading*="${pattern}" i]`);
+                for (const element of Array.from(elements)) {
+                  if (this.isElementVisible(element as HTMLElement)) return true;
+                }
+              }
+
+              const busyElements = document.querySelectorAll('[aria-busy="true"]');
+              for (const element of Array.from(busyElements)) {
+                if (this.isElementVisible(element as HTMLElement)) return true;
+              }
+
+              const loadingElements = document.querySelectorAll('[data-loading="true"]');
+              for (const element of Array.from(loadingElements)) {
+                if (this.isElementVisible(element as HTMLElement)) return true;
+              }
+
+              return false;
+            }
+
+            private isElementVisible(element: HTMLElement): boolean {
+              if (!document.body.contains(element)) return false;
+
+              const style = window.getComputedStyle(element);
+              if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+                return false;
+              }
+
+              const rect = element.getBoundingClientRect();
+              if (rect.width === 0 || rect.height === 0) return false;
+
+              return true;
+            }
+
+            cleanup(): void {
+              if (this.mutationTimeout) {
+                clearTimeout(this.mutationTimeout);
+                this.mutationTimeout = null;
+              }
+            }
+          }
+
+          // Execute detection
+          const detector = new PageLoadDetector(3000, 300);
+          try {
+            const result = await detector.waitForPageReady();
+            detector.cleanup();
+            return result;
+          } catch (error) {
+            detector.cleanup();
+            throw error;
+          }
+        },
+      });
+
+      if (result && result[0] && result[0].result) {
+        return result[0].result;
+      }
+
+      // Fallback if detection fails
+      return {
+        isReady: true,
+        reason: 'Detection script failed, using fallback',
+        duration: 0,
+        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+      };
+    } catch (error) {
+      console.error('[RecorderController] Error during page readiness detection:', error);
+      // Fallback to small delay if detection fails
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return {
+        isReady: true,
+        reason: 'Detection error, used fallback delay',
+        duration: 500,
+        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+      };
+    }
   }
 
   /**

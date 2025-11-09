@@ -97,9 +97,9 @@ export class Recorder {
     // Keyboard events
     this.addListener(document, 'keydown', this.handleKeyDown.bind(this), true);
 
-    // Focus events
-    this.addListener(document, 'focus', this.handleFocus.bind(this), true);
-    this.addListener(document, 'blur', this.handleBlur.bind(this), true);
+    // Focus events - Disabled: not useful for slideshow demos
+    // this.addListener(document, 'focus', this.handleFocus.bind(this), true);
+    // this.addListener(document, 'blur', this.handleBlur.bind(this), true);
 
     console.log('[Recorder] Event listeners setup complete');
   }
@@ -355,46 +355,46 @@ export class Recorder {
   }
 
   /**
-   * Handle focus events
+   * Handle focus events - DISABLED: Not useful for slideshow demos
    */
-  private handleFocus(event: Event): void {
-    const target = event.target as HTMLElement;
+  // private handleFocus(event: Event): void {
+  //   const target = event.target as HTMLElement;
 
-    if (!this.shouldCaptureElement(target)) {
-      return;
-    }
+  //   if (!this.shouldCaptureElement(target)) {
+  //     return;
+  //   }
 
-    this.recordStep({
-      type: EVENT_TYPES.FOCUS,
-      selector: this.generateSelector(target),
-      value: null,
-      timestamp: Date.now(),
-      metadata: {
-        tagName: target.tagName.toLowerCase(),
-      },
-    });
-  }
+  //   this.recordStep({
+  //     type: EVENT_TYPES.FOCUS,
+  //     selector: this.generateSelector(target),
+  //     value: null,
+  //     timestamp: Date.now(),
+  //     metadata: {
+  //       tagName: target.tagName.toLowerCase(),
+  //     },
+  //   });
+  // }
 
   /**
-   * Handle blur events
+   * Handle blur events - DISABLED: Not useful for slideshow demos
    */
-  private handleBlur(event: Event): void {
-    const target = event.target as HTMLElement;
+  // private handleBlur(event: Event): void {
+  //   const target = event.target as HTMLElement;
 
-    if (!this.shouldCaptureElement(target)) {
-      return;
-    }
+  //   if (!this.shouldCaptureElement(target)) {
+  //     return;
+  //   }
 
-    this.recordStep({
-      type: EVENT_TYPES.BLUR,
-      selector: this.generateSelector(target),
-      value: null,
-      timestamp: Date.now(),
-      metadata: {
-        tagName: target.tagName.toLowerCase(),
-      },
-    });
-  }
+  //   this.recordStep({
+  //     type: EVENT_TYPES.BLUR,
+  //     selector: this.generateSelector(target),
+  //     value: null,
+  //     timestamp: Date.now(),
+  //     metadata: {
+  //       tagName: target.tagName.toLowerCase(),
+  //     },
+  //   });
+  // }
 
   /**
    * Handle navigation events

@@ -42,6 +42,17 @@ export interface VisualCapture {
   thumbnail?: string;
 }
 
+export interface PageReadinessState {
+  isReady: boolean;
+  reason: string;
+  duration: number;
+  checks: {
+    domStable: boolean;
+    resourcesLoaded: boolean;
+    noSkeletons: boolean;
+  };
+}
+
 export interface StepMetadata {
   description?: string;
   waitTime?: number;
