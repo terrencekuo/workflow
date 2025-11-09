@@ -2,7 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-// https://vitejs.dev/config/
+// Main config for popup, viewer, and background service worker
+// Content script is built separately with vite.content.config.ts (IIFE format)
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -12,16 +13,11 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/popup/popup.html'),
         viewer: resolve(__dirname, 'src/viewer/viewer.html'),
         background: resolve(__dirname, 'src/background/service-worker.ts'),
-        content: resolve(__dirname, 'src/content/content.ts'),
       },
       output: {
         entryFileNames: (chunkInfo) => {
-          // Keep background and content scripts in their respective directories
           if (chunkInfo.name === 'background') {
             return 'background/service-worker.js';
-          }
-          if (chunkInfo.name === 'content') {
-            return 'content/content.js';
           }
           return '[name]/[name].js';
         },
@@ -48,6 +44,7 @@ export default defineConfig({
           }
           return 'assets/[name]-[hash][extname]';
         },
+        format: 'es',
       },
     },
     sourcemap: process.env.NODE_ENV !== 'production',

@@ -125,6 +125,11 @@ This will watch for changes and rebuild automatically.
 - Delete the `dist` folder and run `npm run build` again
 - Make sure there are no TypeScript errors
 
+**If you see "Uncaught SyntaxError: Cannot use import statement outside a module":**
+- This means the content script wasn't properly built as IIFE format
+- Run `npm run build` to rebuild with the correct format
+- The content script is built separately using `vite.content.config.ts` to ensure IIFE format
+
 ## Usage
 
 ### Recording a Workflow
