@@ -1,9 +1,9 @@
 // Background Service Worker: Entry point for the extension's background logic
-import { MessageBroker } from './MessageBroker';
-import { RecorderController } from './RecorderController';
-import { db } from '../shared/db';
-import { COMMANDS } from '../shared/constants';
-import type { MessageResponse } from '../shared/types';
+import { MessageBroker } from '@/background/MessageBroker';
+import { RecorderController } from '@/background/RecorderController';
+import { db } from '@/shared/db';
+import { COMMANDS } from '@/shared/constants';
+import type { MessageResponse } from '@/shared/types';
 
 console.log('[Background] Service worker starting...');
 

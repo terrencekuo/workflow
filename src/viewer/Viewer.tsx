@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { COMMANDS } from '../shared/constants';
-import type { Session, MessageResponse } from '../shared/types';
+import { COMMANDS } from '@/shared/constants';
+import type { Session, MessageResponse } from '@/shared/types';
 
 async function sendMessage(command: string, data?: any): Promise<MessageResponse> {
   try {

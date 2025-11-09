@@ -1,14 +1,14 @@
 // RecorderController: Manages recording state and coordinates recording across tabs
-import { db } from '../shared/db';
-import { COMMANDS, STORAGE_KEYS } from '../shared/constants';
+import { db } from '@/shared/db';
+import { COMMANDS, STORAGE_KEYS } from '@/shared/constants';
 import type {
   TabRecordingState,
   RecordingState,
   RecordedStep,
   SessionMetadata,
   MessageResponse,
-} from '../shared/types';
-import { MessageBroker } from './MessageBroker';
+} from '@/shared/types';
+import { MessageBroker } from '@/background/MessageBroker';
 
 export class RecorderController {
   private isRecording = false;

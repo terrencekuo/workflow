@@ -1,6 +1,6 @@
 // Content Script: Runs in web pages to capture user interactions
-import { COMMANDS } from '../shared/constants';
-import type { MessagePayload, MessageResponse } from '../shared/types';
+import { COMMANDS } from '@/shared/constants';
+import type { MessagePayload, MessageResponse } from '@/shared/types';
 
 console.log('[Content] Content script loaded');
 

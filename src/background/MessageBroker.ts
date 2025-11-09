@@ -1,5 +1,5 @@
 // MessageBroker: Handles cross-context communication
-import type { MessageHandler, MessagePayload, MessageResponse } from '../shared/types';
+import type { MessageHandler, MessagePayload, MessageResponse } from '@/shared/types';
 
 export class MessageBroker {
   private listeners: Map<string, Set<MessageHandler>> = new Map();

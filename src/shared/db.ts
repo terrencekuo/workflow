@@ -1,6 +1,6 @@
 // IndexedDB wrapper for storing sessions and steps
-import { DB_NAME, DB_VERSION, STORE_SESSIONS, STORE_STEPS } from './constants';
-import type { Session, RecordedStep, SessionMetadata } from './types';
+import { DB_NAME, DB_VERSION, STORE_SESSIONS, STORE_STEPS } from '@/shared/constants';
+import type { Session, RecordedStep, SessionMetadata } from '@/shared/types';
 
 export class DB {
   private db: IDBDatabase | null = null;
