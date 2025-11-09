@@ -1,0 +1,108 @@
+// Core type definitions for the Chrome Workflow Recorder
+
+export type StepType = 'click' | 'input' | 'scroll' | 'navigation' | 'pageLoad';
+
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+export interface ElementContext {
+  tagName: string;
+  attributes: Record<string, string>;
+  textContent: string;
+  boundingBox: DOMRect;
+  computedStyles: Partial<CSSStyleDeclaration>;
+  elementHash: string;
+  parentContext?: ParentContext;
+}
+
+export interface ParentContext {
+  tagName: string;
+  attributes: Record<string, string>;
+  textContent: string;
+}
+
+export interface VisualCapture {
+  fullPage?: string;
+  element?: string;
+  viewport?: string;
+  annotated?: string;
+  thumbnail?: string;
+}
+
+export interface StepMetadata {
+  description?: string;
+  waitTime?: number;
+  scrollPosition?: { x: number; y: number };
+  inputValue?: string;
+  clickCoordinates?: { x: number; y: number };
+}
+
+export interface RecordedStep {
+  id: string;
+  sessionId: string;
+  timestamp: number;
+  type: StepType;
+  url: string;
+  viewport: Viewport;
+  selector: string;
+  alternativeSelectors: string[];
+  elementContext: ElementContext;
+  visual?: VisualCapture;
+  metadata: StepMetadata;
+}
+
+export interface SessionMetadata {
+  title: string;
+  description?: string;
+  startUrl: string;
+  createdAt: number;
+  tags?: string[];
+}
+
+export interface Session {
+  id: string;
+  metadata: SessionMetadata;
+  steps: RecordedStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TabRecordingState {
+  tabId: number;
+  isRecording: boolean;
+  sessionId: string | null;
+  lastUrl: string;
+}
+
+export interface MessagePayload {
+  command: string;
+  data?: any;
+  tabId?: number;
+}
+
+export interface MessageResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export type MessageHandler = (data: any, sender: chrome.runtime.MessageSender) => Promise<MessageResponse> | MessageResponse;
+
+// Selector strategies
+export interface SelectorStrategy {
+  primary: string;
+  fallbacks: string[];
+  confidence: number;
+}
+
+// Recording state
+export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'stopped';
+
+export interface RecordingState {
+  status: RecordingStatus;
+  sessionId: string | null;
+  currentTabId: number | null;
+  stepCount: number;
+}
