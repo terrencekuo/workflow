@@ -1,10 +1,17 @@
 // Content Script: Runs in web pages to capture user interactions
 import { COMMANDS } from '@/shared/constants';
 import type { MessagePayload, MessageResponse } from '@/shared/types';
+import { Recorder } from '@/content/Recorder';
 
 console.log('[Content] Content script loaded');
 
-let currentSessionId: string | null = null;
+// Initialize recorder with configuration
+const recorder = new Recorder({
+  captureHovers: false, // Disable hover capture by default for performance
+  hoverDebounceMs: 500,
+  scrollDebounceMs: 300,
+  batchIntervalMs: 100,
+});
 
 /**
  * Send message to background script
@@ -33,13 +40,13 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, _sender, sendResp
 
   switch (command) {
     case COMMANDS.START_RECORDING:
-      currentSessionId = data.sessionId;
-      console.log('[Content] Started recording for session:', currentSessionId);
+      recorder.start(data.sessionId);
+      console.log('[Content] Started recording for session:', data.sessionId);
       sendResponse({ success: true });
       break;
 
     case COMMANDS.STOP_RECORDING:
-      currentSessionId = null;
+      recorder.stop();
       console.log('[Content] Stopped recording');
       sendResponse({ success: true });
       break;

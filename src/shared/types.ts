@@ -1,6 +1,17 @@
 // Core type definitions for the Chrome Workflow Recorder
 
-export type StepType = 'click' | 'input' | 'scroll' | 'navigation' | 'pageLoad';
+export type StepType =
+  | 'click'
+  | 'input'
+  | 'change'
+  | 'submit'
+  | 'scroll'
+  | 'navigation'
+  | 'pageLoad'
+  | 'hover'
+  | 'keypress'
+  | 'focus'
+  | 'blur';
 
 export interface Viewport {
   width: number;
@@ -34,9 +45,7 @@ export interface VisualCapture {
 export interface StepMetadata {
   description?: string;
   waitTime?: number;
-  scrollPosition?: { x: number; y: number };
-  inputValue?: string;
-  clickCoordinates?: { x: number; y: number };
+  [key: string]: any; // Allow any additional metadata
 }
 
 export interface RecordedStep {
@@ -44,13 +53,14 @@ export interface RecordedStep {
   sessionId: string;
   timestamp: number;
   type: StepType;
-  url: string;
-  viewport: Viewport;
   selector: string;
-  alternativeSelectors: string[];
-  elementContext: ElementContext;
+  value?: string | boolean | null;
+  url?: string;
+  viewport?: Viewport;
+  alternativeSelectors?: string[];
+  elementContext?: ElementContext;
   visual?: VisualCapture;
-  metadata: StepMetadata;
+  metadata?: StepMetadata;
 }
 
 export interface SessionMetadata {

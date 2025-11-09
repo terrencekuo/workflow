@@ -40,9 +40,15 @@ export const COMMANDS = {
 export const EVENT_TYPES = {
   CLICK: 'click',
   INPUT: 'input',
+  CHANGE: 'change',
+  SUBMIT: 'submit',
   SCROLL: 'scroll',
   NAVIGATION: 'navigation',
   PAGE_LOAD: 'pageLoad',
+  HOVER: 'hover',
+  KEYPRESS: 'keypress',
+  FOCUS: 'focus',
+  BLUR: 'blur',
 } as const;
 
 // Timing configurations (in milliseconds)
