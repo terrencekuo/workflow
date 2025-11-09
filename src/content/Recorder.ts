@@ -1,5 +1,6 @@
 import { COMMANDS, EVENT_TYPES } from '@/shared/constants';
 import type { RecordedStep } from '@/shared/types';
+import { DOMAnalyzer } from '@/content/DOMAnalyzer';
 
 interface RecorderConfig {
   captureHovers: boolean;
@@ -25,6 +26,7 @@ export class Recorder {
   private hoverTimeout: number | null = null;
   private scrollTimeout: number | null = null;
   private lastScrollPosition = { x: 0, y: 0 };
+  private domAnalyzer: DOMAnalyzer;
 
   constructor(config?: Partial<RecorderConfig>) {
     this.config = {
@@ -33,6 +35,7 @@ export class Recorder {
       scrollDebounceMs: config?.scrollDebounceMs ?? 300,
       batchIntervalMs: config?.batchIntervalMs ?? 100,
     };
+    this.domAnalyzer = new DOMAnalyzer();
   }
 
   /**
@@ -147,13 +150,18 @@ export class Recorder {
       return;
     }
 
+    const { selector, alternativeSelectors, elementContext } =
+      this.generateSelectorAndContext(target);
+
     this.recordStep({
       type: EVENT_TYPES.CLICK,
-      selector: this.generateSelector(target),
+      selector,
+      alternativeSelectors,
+      elementContext,
       value: null,
+      url: window.location.href,
       timestamp: Date.now(),
       metadata: {
-        tagName: target.tagName.toLowerCase(),
         text: this.getElementText(target),
         href: target instanceof HTMLAnchorElement ? target.href : undefined,
         coordinates: {
@@ -446,49 +454,29 @@ export class Recorder {
   }
 
   /**
-   * Generate a unique selector for an element
-   * This is a simple implementation - will be enhanced in Step 3
+   * Generate robust selector and element context using DOMAnalyzer
+   */
+  private generateSelectorAndContext(element: Element): {
+    selector: string;
+    alternativeSelectors: string[];
+    elementContext: any;
+  } {
+    const strategy = this.domAnalyzer.generateSelectorStrategy(element);
+    const context = this.domAnalyzer.extractElementContext(element);
+
+    return {
+      selector: strategy.primary,
+      alternativeSelectors: strategy.fallbacks,
+      elementContext: context,
+    };
+  }
+
+  /**
+   * Fallback: Generate a simple selector (for backwards compatibility)
    */
   private generateSelector(element: Element): string {
-    // If element has an ID, use it
-    if (element.id) {
-      return `#${element.id}`;
-    }
-
-    // Build path using classes and nth-child
-    const path: string[] = [];
-    let current: Element | null = element;
-
-    while (current && current !== document.body) {
-      let selector = current.tagName.toLowerCase();
-
-      if (current.className) {
-        const classes = Array.from(current.classList)
-          .filter((c) => !c.startsWith('hover:') && !c.startsWith('focus:'))
-          .slice(0, 2)
-          .join('.');
-        if (classes) {
-          selector += `.${classes}`;
-        }
-      }
-
-      // Add nth-child if needed
-      const parent = current.parentElement;
-      if (parent) {
-        const siblings = Array.from(parent.children).filter(
-          (e) => e.tagName === current!.tagName
-        );
-        if (siblings.length > 1) {
-          const index = siblings.indexOf(current) + 1;
-          selector += `:nth-child(${index})`;
-        }
-      }
-
-      path.unshift(selector);
-      current = current.parentElement;
-    }
-
-    return path.join(' > ');
+    const strategy = this.domAnalyzer.generateSelectorStrategy(element);
+    return strategy.primary;
   }
 
   /**
