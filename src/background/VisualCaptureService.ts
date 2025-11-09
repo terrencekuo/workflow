@@ -1,4 +1,4 @@
-import { CONFIG } from '@/shared/constants';
+// Visual capture service for screenshot capture
 import type { VisualCapture } from '@/shared/types';
 
 /**
@@ -59,6 +59,7 @@ export class VisualCaptureService {
     }
   }
 
+
   /**
    * Capture screenshot with element highlighted
    */
@@ -95,53 +96,14 @@ export class VisualCaptureService {
 
   /**
    * Generate thumbnail from full screenshot
+   * Note: Service workers don't have Image/Canvas, so we skip thumbnail generation
+   * and just use the full screenshot
    */
   private async generateThumbnail(dataUrl: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            reject(new Error('Failed to get canvas context'));
-            return;
-          }
-
-          // Calculate dimensions maintaining aspect ratio
-          const maxWidth = CONFIG.THUMBNAIL_WIDTH;
-          const maxHeight = CONFIG.THUMBNAIL_HEIGHT;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = (width * maxHeight) / height;
-              height = maxHeight;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          // Draw scaled image
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Convert to data URL with compression
-          const thumbnail = canvas.toDataURL('image/jpeg', CONFIG.SCREENSHOT_QUALITY);
-          resolve(thumbnail);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = dataUrl;
-    });
+    // Service workers don't have DOM APIs
+    // Return the full screenshot for now
+    // TODO: Use offscreen canvas API if needed for smaller thumbnails
+    return dataUrl;
   }
 
   /**

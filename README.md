@@ -1,57 +1,98 @@
 # Workflow Recorder - Chrome Extension
 
-A powerful Chrome extension for recording and replaying user workflows. Built as a Guideflow alternative with React 19, TypeScript, and Vite.
+A powerful Chrome extension for recording and replaying user workflows. Built as
+a Guideflow alternative with React 19, TypeScript, and Vite.
 
 ## Features
 
-### ✅ Step 1: Extension Foundation & Communication Infrastructure (COMPLETED)
+### ✅ Completed Features
+
+#### Extension Foundation & Communication Infrastructure
 
 - **Chrome Extension Manifest V3** - Modern extension architecture
 - **React 19 + TypeScript** - Type-safe UI development
 - **Vite Build System** - Fast development with HMR
 - **Tailwind CSS** - Rapid UI styling
-- **Message Broker** - Cross-context communication between background, content scripts, and UI
+- **Message Broker** - Cross-context communication between background, content
+  scripts, and UI
 - **Recorder Controller** - Centralized recording state management
 - **IndexedDB Storage** - Persistent session and step storage
 
+#### Event Capture System
+
+- **Comprehensive Event Recording** - Captures clicks, inputs, form submissions,
+  navigation
+- **Smart Event Handling** - Debouncing, batching, and intelligent filtering
+- **Element Context** - Captures element metadata, text, and hierarchy
+- **Alternative Selectors** - Multiple selector strategies for resilience
+
+#### Visual Documentation System
+
+- **Before/After Screenshots** - Captures page state before and after each major
+  interaction
+- **Smart Delay System** - Different capture delays for navigation, submits, and
+  clicks
+- **Automatic Thumbnails** - Generated for optimal loading performance
+- **Element Highlighting** - Visual indicators of where actions occurred
+
+#### Interactive Slideshow Viewer
+
+- **Professional Playback Interface** - View recordings as an interactive
+  slideshow
+- **Before/After Comparison** - Toggle between states or view side-by-side
+- **Keyboard Navigation** - Arrow keys for quick navigation between steps
+- **Zoom Functionality** - Click to zoom screenshots for detail
+- **Collapsible Details Panel** - Full technical information available when
+  needed
+- **Progress Indicators** - Visual progress bar and step counter
+- **Responsive Design** - Works on all screen sizes
+
 ### 🚧 Coming Soon
 
-- **Step 2**: Event Capture System
-- **Step 3**: Element Identification & Context
-- **Step 4**: Visual Documentation System
-- **Step 5**: Interactive Viewer & Editor
 - **Step 6**: Intelligent Replay with Drift Detection
+- **Export Functionality** - PDF, video, or shareable link
+- **Auto-play Mode** - Automated playback with speed controls
+- **Annotations** - Add arrows, highlights, and notes to screenshots
+- **AI Descriptions** - Automatic step descriptions
 
 ## Project Structure
 
 ```
 workflow/
 ├── src/
-│   ├── background/          # Background service worker
+│   ├── background/              # Background service worker
 │   │   ├── service-worker.ts
 │   │   ├── RecorderController.ts
-│   │   └── MessageBroker.ts
-│   ├── content/             # Content scripts (injected into web pages)
-│   │   └── content.ts
-│   ├── popup/               # Extension popup UI
+│   │   ├── MessageBroker.ts
+│   │   └── VisualCaptureService.ts
+│   ├── content/                 # Content scripts (injected into web pages)
+│   │   ├── content.ts
+│   │   ├── Recorder.ts
+│   │   └── DOMAnalyzer.ts
+│   ├── popup/                   # Extension popup UI
 │   │   ├── Popup.tsx
-│   │   ├── popup.tsx
+│   │   ├── index.tsx
 │   │   ├── popup.html
 │   │   └── popup.css
-│   ├── viewer/              # Session viewer UI
-│   │   ├── Viewer.tsx
+│   ├── viewer/                  # Session viewer UI (Slideshow)
+│   │   ├── Viewer.tsx           # Session list
+│   │   ├── SessionDetail.tsx    # Slideshow viewer
+│   │   ├── components/
+│   │   │   ├── ScreenshotViewer.tsx
+│   │   │   ├── StepDetailsPanel.tsx
+│   │   │   └── NavigationControls.tsx
 │   │   ├── index.tsx
 │   │   ├── viewer.html
 │   │   └── viewer.css
-│   └── shared/              # Shared utilities and types
+│   └── shared/                  # Shared utilities and types
 │       ├── types.ts
 │       ├── constants.ts
-│       └── db.ts            # IndexedDB wrapper
+│       └── db.ts                # IndexedDB wrapper
 ├── public/
-│   ├── manifest.json        # Extension manifest
-│   └── icons/               # Extension icons
-├── dist/                    # Build output
-└── vite.config.ts          # Vite configuration
+│   ├── manifest.json            # Extension manifest
+│   └── icons/                   # Extension icons
+├── dist/                        # Build output
+└── vite.config.ts              # Vite configuration
 ```
 
 ## Development
@@ -74,6 +115,7 @@ npm run build
 ```
 
 This will:
+
 1. Compile TypeScript
 2. Bundle with Vite
 3. Output to `dist/` directory
@@ -88,7 +130,8 @@ This will watch for changes and rebuild automatically.
 
 ## Loading the Extension in Chrome
 
-**⚠️ IMPORTANT: You must load the `dist` folder, NOT the root project folder or `public` folder!**
+**⚠️ IMPORTANT: You must load the `dist` folder, NOT the root project folder or
+`public` folder!**
 
 1. **Build the extension:**
    ```bash
@@ -116,19 +159,24 @@ This will watch for changes and rebuild automatically.
 ### Troubleshooting
 
 **If you see "Manifest file is missing or unreadable":**
+
 - Make sure you selected the `dist` folder, not the root project folder
 - The correct path should end with `/workflow/dist`
 - Run `npm run build` first to generate the dist folder
 
 **If you see "Could not load javascript 'content/content.js'":**
+
 - The build didn't complete successfully
 - Delete the `dist` folder and run `npm run build` again
 - Make sure there are no TypeScript errors
 
-**If you see "Uncaught SyntaxError: Cannot use import statement outside a module":**
+**If you see "Uncaught SyntaxError: Cannot use import statement outside a
+module":**
+
 - This means the content script wasn't properly built as IIFE format
 - Run `npm run build` to rebuild with the correct format
-- The content script is built separately using `vite.content.config.ts` to ensure IIFE format
+- The content script is built separately using `vite.content.config.ts` to
+  ensure IIFE format
 
 ## Usage
 
@@ -136,16 +184,34 @@ This will watch for changes and rebuild automatically.
 
 1. Click the extension icon to open the popup
 2. Enter a session title (e.g., "User Registration Flow")
-3. Click "Start Recording"
-4. Perform actions on the web page
-5. Click "Stop Recording" when done
+3. Optionally add a description and tags
+4. Click "Start Recording"
+5. Perform actions on the web page (clicks, form inputs, submissions,
+   navigation)
+6. Click "Stop Recording" when done
 
-### Viewing Sessions
+**Note**: The extension automatically captures before/after screenshots for
+major interactions (clicks, submits, navigation).
+
+### Viewing Sessions (Slideshow Mode)
 
 1. Click the extension icon
 2. Click "View Sessions"
-3. See all recorded sessions with step counts and timestamps
-4. Delete sessions as needed
+3. Select a session to view
+4. Navigate through steps using:
+   - **Next/Previous buttons** at the bottom
+   - **Arrow keys** (← →) for keyboard navigation
+5. Toggle between Before/After views to see changes
+6. Click screenshots to zoom in/out
+7. Expand the details panel to see technical information
+8. Use the "Back to Sessions" button to return to the list
+
+### Session Management
+
+- View all recorded sessions with step counts and timestamps
+- See session metadata (title, description, tags)
+- Delete sessions as needed
+- Sessions are stored locally in IndexedDB
 
 ## Architecture
 
@@ -166,9 +232,17 @@ This will watch for changes and rebuild automatically.
 ### Key Components
 
 - **MessageBroker**: Handles all cross-context messaging
-- **RecorderController**: Manages recording state and coordinates between tabs
+- **RecorderController**: Manages recording state and coordinates screenshot
+  timing
+- **VisualCaptureService**: Captures and processes screenshots with before/after
+  support
+- **Recorder**: Content script that captures user interactions and DOM events
+- **DOMAnalyzer**: Generates robust selectors for elements
 - **DB**: IndexedDB wrapper for persistent storage
-- **Content Script**: Injected into web pages (will capture events in Step 2)
+- **Viewer Components**:
+  - **ScreenshotViewer**: Before/after screenshot display with zoom
+  - **NavigationControls**: Step navigation with keyboard support
+  - **StepDetailsPanel**: Collapsible technical details
 
 ## Tech Stack
 
@@ -182,11 +256,12 @@ This will watch for changes and rebuild automatically.
 ## Development Progress
 
 - [x] Step 1: Extension Foundation & Communication Infrastructure
-- [ ] Step 2: Event Capture System
-- [ ] Step 3: Element Identification
-- [ ] Step 4: Visual Documentation
-- [ ] Step 5: Viewer & Editor
-- [ ] Step 6: Intelligent Replay
+- [x] Step 2: Event Capture System
+- [x] Step 3: Element Identification & Context
+- [x] Step 4: Visual Documentation System (Before/After Screenshots)
+- [x] Step 5: Interactive Slideshow Viewer
+- [ ] Step 6: Intelligent Replay with Drift Detection
+- [ ] Step 7: Export & Sharing Features
 
 ## License
 

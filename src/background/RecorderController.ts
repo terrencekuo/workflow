@@ -160,6 +160,7 @@ export class RecorderController {
 
   /**
    * Handle record step command from content script
+   * Captures ONE screenshot after the event with appropriate delay
    */
   private async handleRecordStep(
     step: RecordedStep
@@ -172,20 +173,30 @@ export class RecorderController {
       // Ensure step has session ID
       step.sessionId = this.currentSessionId;
 
-      // Capture screenshot for important events
+      // Capture screenshot for major events AFTER the event with delay
       if (this.shouldCaptureVisual(step.type) && this.currentTabId) {
         try {
-          const visual = await this.visualCaptureService.captureStepVisual(
-            this.currentTabId,
-            step.selector
+          // Wait for page changes to settle based on event type
+          const delay = this.getScreenshotDelay(step.type);
+          if (delay > 0) {
+            await this.sleep(delay);
+          }
+
+          // Capture ONE screenshot
+          const screenshot = await this.visualCaptureService.captureTabScreenshot(
+            this.currentTabId
           );
-          if (visual) {
-            step.visual = visual;
-            console.log('[RecorderController] Captured visual for step:', step.type);
+
+          if (screenshot) {
+            step.visual = {
+              viewport: screenshot,
+              thumbnail: screenshot, // No thumbnail generation for now
+            };
+            console.log('[RecorderController] Captured screenshot for step:', step.type);
           }
         } catch (error) {
           // Don't fail the step if screenshot fails
-          console.warn('[RecorderController] Failed to capture visual:', error);
+          console.warn('[RecorderController] Failed to capture screenshot:', error);
         }
       }
 
@@ -205,6 +216,33 @@ export class RecorderController {
         error: error instanceof Error ? error.message : 'Failed to record step',
       };
     }
+  }
+
+  /**
+   * Get appropriate delay before taking screenshot based on event type
+   */
+  private getScreenshotDelay(stepType: string): number {
+    // Navigation events need more time to load
+    if (stepType === EVENT_TYPES.NAVIGATION) {
+      return 1500; // 1.5 seconds for page loads
+    }
+    // Form submissions that might trigger navigation
+    if (stepType === EVENT_TYPES.SUBMIT) {
+      return 1000; // 1 second for form submissions
+    }
+    // Click events that might trigger dynamic content
+    if (stepType === EVENT_TYPES.CLICK) {
+      return 500; // 0.5 seconds for clicks
+    }
+    // Default - no delay for other events
+    return 0;
+  }
+
+  /**
+   * Sleep utility
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

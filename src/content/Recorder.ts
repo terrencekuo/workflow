@@ -153,6 +153,7 @@ export class Recorder {
     const { selector, alternativeSelectors, elementContext } =
       this.generateSelectorAndContext(target);
 
+    // Record the step (screenshot will be captured by background after delay)
     this.recordStep({
       type: EVENT_TYPES.CLICK,
       selector,
@@ -247,6 +248,7 @@ export class Recorder {
   private handleSubmit(event: Event): void {
     const target = event.target as HTMLFormElement;
 
+    // Record the step (screenshot will be captured by background after delay)
     this.recordStep({
       type: EVENT_TYPES.SUBMIT,
       selector: this.generateSelector(target),
@@ -430,6 +432,7 @@ export class Recorder {
 
   /**
    * Record a step and send to background
+   * Background will capture screenshot after appropriate delay
    */
   private recordStep(stepData: Omit<RecordedStep, 'id' | 'sessionId'>): void {
     if (!this.isRecording || !this.sessionId) {
