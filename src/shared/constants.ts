@@ -53,12 +53,29 @@ export const EVENT_TYPES = {
 
 // Timing configurations (in milliseconds)
 export const TIMING = {
+  // Event recording
   EVENT_QUEUE_BATCH: 100,
   SCROLL_THROTTLE: 200,
   HEARTBEAT_INTERVAL: 5000,
   CONTENT_SCRIPT_TIMEOUT: 5000,
   RETRY_DELAY: 1000,
   MAX_RETRIES: 3,
+
+  // Page readiness detection
+  PAGE_LOAD_MAX_TIMEOUT: 25000,        // Max time to wait for page to be ready
+  DOM_STABILITY_WAIT: 5000,             // Time of no DOM changes to consider stable
+  SKELETON_MAX_WAIT: 25000,             // Max time to wait for skeleton loaders to disappear
+  SKELETON_CHECK_INTERVAL: 500,        // Interval to check for skeleton elements
+  RESOURCE_LOAD_TIMEOUT: 25000,         // Timeout for individual resources (images, iframes)
+
+  // Screenshot capture
+  ZOOM_REFLOW_WAIT: 300,               // Wait time after zoom change for page reflow
+  HIGHLIGHT_RENDER_WAIT: 1000,          // Wait time for highlight overlay to render
+  SCROLL_COMPLETE_WAIT: 300,           // Wait time for scroll animation to complete
+
+  // Content script initialization
+  CONTENT_SCRIPT_INIT_WAIT: 500,       // Wait time after injecting content script
+  PAGE_READINESS_FALLBACK_DELAY: 500,  // Fallback delay if page detection fails
 } as const;
 
 // Storage keys

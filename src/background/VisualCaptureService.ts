@@ -1,5 +1,6 @@
 // Visual capture service for screenshot capture
 import type { VisualCapture } from '@/shared/types';
+import { TIMING } from '@/shared/constants';
 
 /**
  * VisualCaptureService - Intelligent screenshot capture and compression
@@ -25,7 +26,7 @@ export class VisualCaptureService {
         await chrome.tabs.setZoom(tabId, 1.0);
 
         // Wait a moment for the page to reflow at new zoom level
-        await this.sleep(200);
+        await this.sleep(TIMING.ZOOM_REFLOW_WAIT);
       }
 
       // Capture visible tab area at 100% zoom
@@ -78,7 +79,7 @@ export class VisualCaptureService {
             private mutationTimeout: number | null = null;
             private lastMutationTime: number = 0;
 
-            constructor(maxTimeout = 3000, domStabilityWait = 300) {
+            constructor(maxTimeout = TIMING.PAGE_LOAD_MAX_TIMEOUT, domStabilityWait = TIMING.DOM_STABILITY_WAIT) {
               this.maxTimeout = maxTimeout;
               this.domStabilityWait = domStabilityWait;
             }
@@ -199,7 +200,7 @@ export class VisualCaptureService {
 
                 promises.push(
                   new Promise<void>((resolve) => {
-                    const timeout = setTimeout(() => resolve(), 2000);
+                    const timeout = setTimeout(() => resolve(), TIMING.RESOURCE_LOAD_TIMEOUT);
                     const onLoad = () => {
                       clearTimeout(timeout);
                       resolve();
@@ -214,8 +215,8 @@ export class VisualCaptureService {
             }
 
             private async waitForSkeletonDisappear(): Promise<void> {
-              const maxWait = 1500;
-              const checkInterval = 100;
+              const maxWait = TIMING.SKELETON_MAX_WAIT;
+              const checkInterval = TIMING.SKELETON_CHECK_INTERVAL;
               const startTime = Date.now();
 
               return new Promise((resolve) => {
@@ -284,7 +285,7 @@ export class VisualCaptureService {
           }
 
           // Execute detection
-          const detector = new PageLoadDetector(3000, 300);
+          const detector = new PageLoadDetector(TIMING.PAGE_LOAD_MAX_TIMEOUT, TIMING.DOM_STABILITY_WAIT);
           try {
             const result = await detector.waitForPageReady();
             detector.cleanup();
@@ -376,7 +377,7 @@ export class VisualCaptureService {
       });
 
       // Wait for highlight to render
-      await this.sleep(100);
+      await this.sleep(TIMING.HIGHLIGHT_RENDER_WAIT);
 
       // Capture screenshot
       const screenshot = await this.captureTabScreenshot(tabId);
@@ -497,7 +498,7 @@ export class VisualCaptureService {
       });
 
       // Wait for scroll to complete
-      await this.sleep(300);
+      await this.sleep(TIMING.SCROLL_COMPLETE_WAIT);
 
       // Capture with highlight
       return await this.captureWithHighlight(tabId, selector);

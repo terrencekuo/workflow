@@ -1,6 +1,6 @@
 // RecorderController: Manages recording state and coordinates recording across tabs
 import { db } from '@/shared/db';
-import { COMMANDS, STORAGE_KEYS, EVENT_TYPES } from '@/shared/constants';
+import { COMMANDS, STORAGE_KEYS, EVENT_TYPES, TIMING } from '@/shared/constants';
 import type {
   TabRecordingState,
   RecordingState,
@@ -262,7 +262,7 @@ export class RecorderController {
             private mutationTimeout: number | null = null;
             private lastMutationTime: number = 0;
 
-            constructor(maxTimeout = 3000, domStabilityWait = 300) {
+            constructor(maxTimeout = TIMING.PAGE_LOAD_MAX_TIMEOUT, domStabilityWait = TIMING.DOM_STABILITY_WAIT) {
               this.maxTimeout = maxTimeout;
               this.domStabilityWait = domStabilityWait;
             }
@@ -383,7 +383,7 @@ export class RecorderController {
 
                 promises.push(
                   new Promise<void>((resolve) => {
-                    const timeout = setTimeout(() => resolve(), 2000);
+                    const timeout = setTimeout(() => resolve(), TIMING.RESOURCE_LOAD_TIMEOUT);
                     const onLoad = () => {
                       clearTimeout(timeout);
                       resolve();
@@ -398,8 +398,8 @@ export class RecorderController {
             }
 
             private async waitForSkeletonDisappear(): Promise<void> {
-              const maxWait = 1500;
-              const checkInterval = 100;
+              const maxWait = TIMING.SKELETON_MAX_WAIT;
+              const checkInterval = TIMING.SKELETON_CHECK_INTERVAL;
               const startTime = Date.now();
 
               return new Promise((resolve) => {
@@ -468,7 +468,7 @@ export class RecorderController {
           }
 
           // Execute detection
-          const detector = new PageLoadDetector(3000, 300);
+          const detector = new PageLoadDetector(TIMING.PAGE_LOAD_MAX_TIMEOUT, TIMING.DOM_STABILITY_WAIT);
           try {
             const result = await detector.waitForPageReady();
             detector.cleanup();
@@ -494,11 +494,11 @@ export class RecorderController {
     } catch (error) {
       console.error('[RecorderController] Error during page readiness detection:', error);
       // Fallback to small delay if detection fails
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
       return {
         isReady: true,
         reason: 'Detection error, used fallback delay',
-        duration: 500,
+        duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
         checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
       };
     }
@@ -659,7 +659,7 @@ export class RecorderController {
       console.log('[RecorderController] Content script injected into tab:', tabId);
 
       // Wait a bit for the content script to initialize
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, TIMING.CONTENT_SCRIPT_INIT_WAIT));
     } catch (error) {
       console.error('[RecorderController] Error injecting content script:', error);
       throw error;
