@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { COMMANDS } from '@/shared/constants';
 import type { Session, MessageResponse } from '@/shared/types';
+import SessionDetail from '@/viewer/SessionDetail';
 
 async function sendMessage(command: string, data?: any): Promise<MessageResponse> {
   try {
@@ -17,6 +18,7 @@ async function sendMessage(command: string, data?: any): Promise<MessageResponse
 
 export default function Viewer() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +58,16 @@ export default function Viewer() {
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
   };
+
+  // Show detail view if a session is selected
+  if (selectedSessionId) {
+    return (
+      <SessionDetail
+        sessionId={selectedSessionId}
+        onBack={() => setSelectedSessionId(null)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -121,6 +133,12 @@ export default function Viewer() {
                     )}
                   </div>
                   <div className="flex gap-2 ml-4">
+                    <button
+                      onClick={() => setSelectedSessionId(session.id)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
+                    >
+                      View
+                    </button>
                     <button
                       onClick={() => deleteSession(session.id)}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors"
