@@ -70,6 +70,16 @@ export default function Popup() {
     }
   };
 
+  const handleCaptureScreenshot = async () => {
+    const response = await sendMessage(COMMANDS.CAPTURE_SCREENSHOT);
+
+    if (response.success) {
+      await loadRecordingState();
+    } else {
+      setError(response.error || 'Failed to capture screenshot');
+    }
+  };
+
   const openViewer = () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('viewer/viewer.html') });
   };
@@ -106,6 +116,14 @@ export default function Popup() {
               </p>
             </div>
           </div>
+
+          <button
+            onClick={handleCaptureScreenshot}
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors flex items-center justify-center gap-2"
+          >
+            <span>📸</span>
+            <span>Capture Screenshot</span>
+          </button>
 
           <button
             onClick={handleStopRecording}

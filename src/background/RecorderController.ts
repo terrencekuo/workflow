@@ -35,6 +35,7 @@ export class RecorderController {
     this.messageBroker.on(COMMANDS.START_RECORDING, this.handleStartRecording.bind(this));
     this.messageBroker.on(COMMANDS.STOP_RECORDING, this.handleStopRecording.bind(this));
     this.messageBroker.on(COMMANDS.RECORD_STEP, this.handleRecordStep.bind(this));
+    this.messageBroker.on(COMMANDS.CAPTURE_SCREENSHOT, this.handleCaptureScreenshot.bind(this));
     this.messageBroker.on(COMMANDS.GET_RECORDING_STATE, this.handleGetState.bind(this));
     this.messageBroker.on(COMMANDS.CONTENT_SCRIPT_READY, this.handleContentScriptReady.bind(this));
   }
@@ -500,6 +501,72 @@ export class RecorderController {
         reason: 'Detection error, used fallback delay',
         duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
         checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+      };
+    }
+  }
+
+  /**
+   * Handle manual screenshot capture command
+   */
+  private async handleCaptureScreenshot(): Promise<MessageResponse> {
+    try {
+      if (!this.isRecording || !this.currentSessionId || !this.currentTabId) {
+        return { success: false, error: 'Not currently recording' };
+      }
+
+      console.log('[RecorderController] Manual screenshot capture requested');
+
+      // Get current tab info
+      const tab = await chrome.tabs.get(this.currentTabId);
+
+      // Wait for page to be ready
+      const readinessState = await this.waitForPageReadiness(this.currentTabId);
+
+      console.log(
+        `[RecorderController] Manual capture page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
+        readinessState.checks
+      );
+
+      // Capture screenshot
+      const screenshot = await this.visualCaptureService.captureTabScreenshot(this.currentTabId);
+
+      if (screenshot) {
+        // Create a manual capture step
+        const manualStep: RecordedStep = {
+          id: crypto.randomUUID(),
+          sessionId: this.currentSessionId,
+          type: EVENT_TYPES.PAGE_LOAD,
+          selector: 'window',
+          value: tab.url || '',
+          url: tab.url || '',
+          timestamp: Date.now(),
+          metadata: {
+            type: 'manualCapture',
+            url: tab.url || '',
+            pageReadiness: readinessState,
+            description: 'Manual screenshot capture',
+          },
+          visual: {
+            viewport: screenshot,
+            thumbnail: screenshot,
+          },
+        };
+
+        // Save to database
+        await db.addStep(this.currentSessionId, manualStep);
+        this.stepCount++;
+        await this.saveState();
+
+        console.log('[RecorderController] Manual screenshot captured successfully');
+        return { success: true, data: { stepId: manualStep.id } };
+      }
+
+      return { success: false, error: 'Failed to capture screenshot' };
+    } catch (error) {
+      console.error('[RecorderController] Error capturing manual screenshot:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to capture screenshot',
       };
     }
   }

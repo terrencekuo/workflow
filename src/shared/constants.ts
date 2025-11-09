@@ -16,6 +16,7 @@ export const COMMANDS = {
 
   // Step commands
   RECORD_STEP: 'record_step',
+  CAPTURE_SCREENSHOT: 'capture_screenshot',
   GET_STEPS: 'get_steps',
   UPDATE_STEP: 'update_step',
   DELETE_STEP: 'delete_step',
@@ -62,15 +63,15 @@ export const TIMING = {
   MAX_RETRIES: 3,
 
   // Page readiness detection
-  PAGE_LOAD_MAX_TIMEOUT: 25000,        // Max time to wait for page to be ready
-  DOM_STABILITY_WAIT: 5000,             // Time of no DOM changes to consider stable
-  SKELETON_MAX_WAIT: 25000,             // Max time to wait for skeleton loaders to disappear
-  SKELETON_CHECK_INTERVAL: 500,        // Interval to check for skeleton elements
-  RESOURCE_LOAD_TIMEOUT: 25000,         // Timeout for individual resources (images, iframes)
+  PAGE_LOAD_MAX_TIMEOUT: 10000,        // Max time to wait for page to be ready (10s)
+  DOM_STABILITY_WAIT: 800,             // Time of no DOM changes to consider stable (0.8s)
+  SKELETON_MAX_WAIT: 5000,             // Max time to wait for skeleton loaders to disappear (5s)
+  SKELETON_CHECK_INTERVAL: 100,        // Interval to check for skeleton elements (100ms)
+  RESOURCE_LOAD_TIMEOUT: 5000,         // Timeout for individual resources (5s)
 
   // Screenshot capture
   ZOOM_REFLOW_WAIT: 300,               // Wait time after zoom change for page reflow
-  HIGHLIGHT_RENDER_WAIT: 1000,          // Wait time for highlight overlay to render
+  HIGHLIGHT_RENDER_WAIT: 150,          // Wait time for highlight overlay to render
   SCROLL_COMPLETE_WAIT: 300,           // Wait time for scroll animation to complete
 
   // Content script initialization

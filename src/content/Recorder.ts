@@ -24,8 +24,8 @@ export class Recorder {
   }> = [];
   private config: RecorderConfig;
   private hoverTimeout: number | null = null;
-  private scrollTimeout: number | null = null;
-  private lastScrollPosition = { x: 0, y: 0 };
+  // private scrollTimeout: number | null = null;
+  // private lastScrollPosition = { x: 0, y: 0 };
   private domAnalyzer: DOMAnalyzer;
 
   constructor(config?: Partial<RecorderConfig>) {
@@ -87,8 +87,8 @@ export class Recorder {
     // this.addListener(window, 'beforeunload', this.handleBeforeUnload.bind(this));
     this.addListener(window, 'popstate', this.handleNavigation.bind(this));
 
-    // Scroll events
-    this.addListener(window, 'scroll', this.handleScroll.bind(this), { passive: true });
+    // Scroll events - Disabled: not useful for slideshow demos (clutters the view)
+    // this.addListener(window, 'scroll', this.handleScroll.bind(this), { passive: true });
 
     // Hover events (optional)
     if (this.config.captureHovers) {
@@ -119,10 +119,11 @@ export class Recorder {
       this.hoverTimeout = null;
     }
 
-    if (this.scrollTimeout) {
-      window.clearTimeout(this.scrollTimeout);
-      this.scrollTimeout = null;
-    }
+    // Scroll tracking disabled
+    // if (this.scrollTimeout) {
+    //   window.clearTimeout(this.scrollTimeout);
+    //   this.scrollTimeout = null;
+    // }
 
     console.log('[Recorder] Event listeners removed');
   }
@@ -265,38 +266,39 @@ export class Recorder {
 
   /**
    * Handle scroll events with debouncing
+   * Note: Disabled for slideshow demos (clutters the view)
    */
-  private handleScroll(): void {
-    if (this.scrollTimeout) {
-      window.clearTimeout(this.scrollTimeout);
-    }
+  // private handleScroll(): void {
+  //   if (this.scrollTimeout) {
+  //     window.clearTimeout(this.scrollTimeout);
+  //   }
 
-    this.scrollTimeout = window.setTimeout(() => {
-      const x = window.scrollX;
-      const y = window.scrollY;
+  //   this.scrollTimeout = window.setTimeout(() => {
+  //     const x = window.scrollX;
+  //     const y = window.scrollY;
 
-      // Only record if scroll position changed significantly
-      if (
-        Math.abs(x - this.lastScrollPosition.x) > 10 ||
-        Math.abs(y - this.lastScrollPosition.y) > 10
-      ) {
-        this.recordStep({
-          type: EVENT_TYPES.SCROLL,
-          selector: 'window',
-          value: null,
-          timestamp: Date.now(),
-          metadata: {
-            scrollX: x,
-            scrollY: y,
-            scrollHeight: document.documentElement.scrollHeight,
-            scrollWidth: document.documentElement.scrollWidth,
-          },
-        });
+  //     // Only record if scroll position changed significantly
+  //     if (
+  //       Math.abs(x - this.lastScrollPosition.x) > 10 ||
+  //       Math.abs(y - this.lastScrollPosition.y) > 10
+  //     ) {
+  //       this.recordStep({
+  //         type: EVENT_TYPES.SCROLL,
+  //         selector: 'window',
+  //         value: null,
+  //         timestamp: Date.now(),
+  //         metadata: {
+  //           scrollX: x,
+  //           scrollY: y,
+  //           scrollHeight: document.documentElement.scrollHeight,
+  //           scrollWidth: document.documentElement.scrollWidth,
+  //         },
+  //       });
 
-        this.lastScrollPosition = { x, y };
-      }
-    }, this.config.scrollDebounceMs);
-  }
+  //       this.lastScrollPosition = { x, y };
+  //     }
+  //   }, this.config.scrollDebounceMs);
+  // }
 
   /**
    * Handle hover events with debouncing
