@@ -1,6 +1,6 @@
 // RecorderController: Manages recording state and coordinates recording across tabs
 import { db } from '@/shared/db';
-import { COMMANDS, STORAGE_KEYS } from '@/shared/constants';
+import { COMMANDS, STORAGE_KEYS, EVENT_TYPES } from '@/shared/constants';
 import type {
   TabRecordingState,
   RecordingState,
@@ -9,6 +9,7 @@ import type {
   MessageResponse,
 } from '@/shared/types';
 import { MessageBroker } from '@/background/MessageBroker';
+import { VisualCaptureService } from '@/background/VisualCaptureService';
 
 export class RecorderController {
   private isRecording = false;
@@ -16,10 +17,12 @@ export class RecorderController {
   private currentTabId: number | null = null;
   private tabStates: Map<number, TabRecordingState> = new Map();
   private messageBroker: MessageBroker;
+  private visualCaptureService: VisualCaptureService;
   private stepCount = 0;
 
-  constructor(messageBroker: MessageBroker) {
+  constructor(messageBroker: MessageBroker, visualCaptureService: VisualCaptureService) {
     this.messageBroker = messageBroker;
+    this.visualCaptureService = visualCaptureService;
     this.setupMessageHandlers();
     this.setupTabListeners();
     this.restoreState();
@@ -168,6 +171,23 @@ export class RecorderController {
 
       // Ensure step has session ID
       step.sessionId = this.currentSessionId;
+
+      // Capture screenshot for important events
+      if (this.shouldCaptureVisual(step.type) && this.currentTabId) {
+        try {
+          const visual = await this.visualCaptureService.captureStepVisual(
+            this.currentTabId,
+            step.selector
+          );
+          if (visual) {
+            step.visual = visual;
+            console.log('[RecorderController] Captured visual for step:', step.type);
+          }
+        } catch (error) {
+          // Don't fail the step if screenshot fails
+          console.warn('[RecorderController] Failed to capture visual:', error);
+        }
+      }
 
       // Save step to database
       await db.addStep(this.currentSessionId, step);
@@ -338,6 +358,19 @@ export class RecorderController {
       console.error('[RecorderController] Error injecting content script:', error);
       throw error;
     }
+  }
+
+  /**
+   * Determine if a step type should have visual capture
+   */
+  private shouldCaptureVisual(stepType: string): boolean {
+    // Capture screenshots for interactive events
+    const visualEvents = [
+      EVENT_TYPES.CLICK,
+      EVENT_TYPES.SUBMIT,
+      EVENT_TYPES.NAVIGATION,
+    ];
+    return visualEvents.includes(stepType as any);
   }
 
   /**

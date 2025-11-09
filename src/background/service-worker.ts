@@ -1,6 +1,7 @@
 // Background Service Worker: Entry point for the extension's background logic
 import { MessageBroker } from '@/background/MessageBroker';
 import { RecorderController } from '@/background/RecorderController';
+import { VisualCaptureService } from '@/background/VisualCaptureService';
 import { db } from '@/shared/db';
 import { COMMANDS } from '@/shared/constants';
 import type { MessageResponse } from '@/shared/types';
@@ -15,8 +16,11 @@ db.init().catch(error => {
 // Initialize message broker
 const messageBroker = new MessageBroker();
 
+// Initialize visual capture service
+const visualCaptureService = new VisualCaptureService();
+
 // Initialize recorder controller
-const recorderController = new RecorderController(messageBroker);
+const recorderController = new RecorderController(messageBroker, visualCaptureService);
 
 // Register session management handlers
 messageBroker.on(COMMANDS.GET_ALL_SESSIONS, async (): Promise<MessageResponse> => {
