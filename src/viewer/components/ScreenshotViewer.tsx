@@ -46,11 +46,11 @@ export default function ScreenshotViewer({ visual, stepNumber, totalSteps }: Scr
         )}
 
         {/* Screenshot Container */}
-        <div className="min-h-[500px] max-h-[600px] bg-gray-900 rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
+        <div className="min-h-[500px] bg-gray-900 rounded-lg overflow-auto shadow-lg flex items-start justify-center p-4">
           <img
             src={screenshot}
             alt="Screenshot"
-            className={`max-w-full max-h-full object-contain transition-transform duration-200 ${
+            className={`w-full object-contain transition-transform duration-200 ${
               isZoomed ? 'cursor-zoom-out scale-150' : 'cursor-zoom-in'
             }`}
             onClick={() => setIsZoomed(!isZoomed)}
