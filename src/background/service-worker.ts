@@ -8,16 +8,18 @@ import type { MessageResponse } from '@/shared/types';
 
 console.log('[Background] Service worker starting...');
 
-// Initialize database
-db.init().catch(error => {
-  console.error('[Background] Failed to initialize database:', error);
-});
-
-// Initialize message broker
+// Initialize message broker first
 const messageBroker = new MessageBroker();
 
 // Initialize visual capture service
 const visualCaptureService = new VisualCaptureService();
+
+// Initialize database
+db.init()
+  .then(() => console.log('[Background] Database initialized'))
+  .catch(error => {
+    console.error('[Background] Failed to initialize database:', error);
+  });
 
 // Initialize recorder controller
 const recorderController = new RecorderController(messageBroker, visualCaptureService);
@@ -25,7 +27,9 @@ const recorderController = new RecorderController(messageBroker, visualCaptureSe
 // Register session management handlers
 messageBroker.on(COMMANDS.GET_ALL_SESSIONS, async (): Promise<MessageResponse> => {
   try {
+    console.log('[Background] GET_ALL_SESSIONS called');
     const sessions = await db.getAllSessions();
+    console.log('[Background] Found sessions:', sessions.length);
     return { success: true, data: sessions };
   } catch (error) {
     console.error('[Background] Error getting sessions:', error);
@@ -38,10 +42,13 @@ messageBroker.on(COMMANDS.GET_ALL_SESSIONS, async (): Promise<MessageResponse> =
 
 messageBroker.on(COMMANDS.GET_SESSION, async (data: { sessionId: string }): Promise<MessageResponse> => {
   try {
+    console.log('[Background] GET_SESSION called for:', data.sessionId);
     const session = await db.getSession(data.sessionId);
     if (!session) {
+      console.log('[Background] Session not found:', data.sessionId);
       return { success: false, error: 'Session not found' };
     }
+    console.log('[Background] Session found with', session.steps.length, 'steps');
     return { success: true, data: session };
   } catch (error) {
     console.error('[Background] Error getting session:', error);

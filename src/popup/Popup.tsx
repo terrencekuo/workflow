@@ -53,8 +53,8 @@ export default function Popup() {
     const response = await sendMessage(COMMANDS.START_RECORDING, { metadata });
 
     if (response.success) {
-      await loadRecordingState();
-      setSessionTitle('');
+      // Close the popup after starting recording
+      window.close();
     } else {
       setError(response.error || 'Failed to start recording');
     }

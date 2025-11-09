@@ -85,6 +85,10 @@ export class RecorderController {
         this.currentSessionId = state.sessionId;
         this.currentTabId = state.currentTabId;
         this.stepCount = state.stepCount;
+
+        // Restore badge state
+        await this.updateBadge(this.isRecording);
+
         console.log('[RecorderController] State restored:', state);
       }
     } catch (error) {
@@ -553,8 +557,14 @@ export class RecorderController {
     this.isRecording = true;
     this.stepCount = 0;
 
+    // Update badge to show recording status
+    await this.updateBadge(true);
+
     // Ensure content script is loaded
     await this.ensureContentScriptLoaded(tabId);
+
+    // Capture initial screenshot of the starting page
+    await this.captureInitialScreenshot(tabId);
 
     // Send start recording message to content script
     await this.messageBroker.emit(COMMANDS.START_RECORDING, { sessionId }, tabId);
@@ -582,6 +592,9 @@ export class RecorderController {
     this.currentSessionId = null;
     this.currentTabId = null;
     this.stepCount = 0;
+
+    // Update badge to show idle status
+    await this.updateBadge(false);
 
     // Save state
     await this.saveState();
@@ -734,5 +747,78 @@ export class RecorderController {
       currentTabId: this.currentTabId,
       stepCount: this.stepCount,
     };
+  }
+
+  /**
+   * Capture initial screenshot when recording starts
+   */
+  private async captureInitialScreenshot(tabId: number): Promise<void> {
+    try {
+      console.log('[RecorderController] Capturing initial screenshot...');
+
+      // Get current tab info
+      const tab = await chrome.tabs.get(tabId);
+
+      // Wait for page to be ready
+      const readinessState = await this.waitForPageReadiness(tabId);
+
+      console.log(
+        `[RecorderController] Initial page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
+        readinessState.checks
+      );
+
+      // Capture screenshot
+      const screenshot = await this.visualCaptureService.captureTabScreenshot(tabId);
+
+      if (screenshot && this.currentSessionId) {
+        // Create an initial step to show the starting point
+        const initialStep: RecordedStep = {
+          id: crypto.randomUUID(),
+          sessionId: this.currentSessionId,
+          type: EVENT_TYPES.PAGE_LOAD,
+          selector: 'window',
+          value: tab.url || '',
+          url: tab.url || '',
+          timestamp: Date.now(),
+          metadata: {
+            type: 'initialState',
+            url: tab.url || '',
+            pageReadiness: readinessState,
+            description: 'Initial page state when recording started',
+          },
+          visual: {
+            viewport: screenshot,
+            thumbnail: screenshot,
+          },
+        };
+
+        // Save initial step to database
+        await db.addStep(this.currentSessionId, initialStep);
+        this.stepCount++;
+
+        console.log('[RecorderController] Initial screenshot captured');
+      }
+    } catch (error) {
+      console.error('[RecorderController] Error capturing initial screenshot:', error);
+      // Don't fail recording if initial screenshot fails
+    }
+  }
+
+  /**
+   * Update extension badge to show recording status
+   */
+  private async updateBadge(isRecording: boolean): Promise<void> {
+    try {
+      if (isRecording) {
+        await chrome.action.setBadgeText({ text: 'REC' });
+        await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' }); // Red
+        await chrome.action.setTitle({ title: 'Recording in progress - Click to stop' });
+      } else {
+        await chrome.action.setBadgeText({ text: '' });
+        await chrome.action.setTitle({ title: 'Workflow Recorder - Click to start' });
+      }
+    } catch (error) {
+      console.error('[RecorderController] Error updating badge:', error);
+    }
   }
 }

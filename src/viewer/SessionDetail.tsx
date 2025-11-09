@@ -37,13 +37,17 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
     setLoading(true);
     setError(null);
 
+    console.log('[SessionDetail] Loading session:', sessionId);
     const response = await sendMessage(COMMANDS.GET_SESSION, { sessionId });
+    console.log('[SessionDetail] Response:', response);
 
     if (response.success && response.data) {
+      console.log('[SessionDetail] Session loaded with', response.data.steps.length, 'steps');
       setSession(response.data);
       // Start at the first step
       setCurrentStepIndex(0);
     } else {
+      console.error('[SessionDetail] Error loading session:', response.error);
       setError(response.error || 'Failed to load session');
     }
 

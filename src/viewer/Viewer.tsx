@@ -30,11 +30,15 @@ export default function Viewer() {
     setLoading(true);
     setError(null);
 
+    console.log('[Viewer] Loading sessions...');
     const response = await sendMessage(COMMANDS.GET_ALL_SESSIONS);
+    console.log('[Viewer] Response:', response);
 
     if (response.success && response.data) {
+      console.log('[Viewer] Loaded', response.data.length, 'sessions');
       setSessions(response.data);
     } else {
+      console.error('[Viewer] Error loading sessions:', response.error);
       setError(response.error || 'Failed to load sessions');
     }
 
