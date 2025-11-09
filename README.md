@@ -88,6 +88,8 @@ This will watch for changes and rebuild automatically.
 
 ## Loading the Extension in Chrome
 
+**⚠️ IMPORTANT: You must load the `dist` folder, NOT the root project folder or `public` folder!**
+
 1. **Build the extension:**
    ```bash
    npm run build
@@ -99,15 +101,29 @@ This will watch for changes and rebuild automatically.
    ```
 
 3. **Enable Developer Mode:**
-   - Toggle the "Developer mode" switch in the top right
+   - Toggle the "Developer mode" switch in the top right corner
 
 4. **Load the extension:**
    - Click "Load unpacked"
-   - Select the `dist` folder in this project
+   - Navigate to: **`~/Documents/workflow/dist`**
+   - Select the `dist` folder (this is crucial!)
 
 5. **The extension is now loaded!**
+   - You should see "Workflow Recorder" in your extensions list
    - Click the extension icon in the toolbar to open the popup
    - Start recording workflows
+
+### Troubleshooting
+
+**If you see "Manifest file is missing or unreadable":**
+- Make sure you selected the `dist` folder, not the root project folder
+- The correct path should end with `/workflow/dist`
+- Run `npm run build` first to generate the dist folder
+
+**If you see "Could not load javascript 'content/content.js'":**
+- The build didn't complete successfully
+- Delete the `dist` folder and run `npm run build` again
+- Make sure there are no TypeScript errors
 
 ## Usage
 
