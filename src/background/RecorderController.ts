@@ -342,6 +342,8 @@ export class RecorderController {
       throw new Error('Recording already in progress');
     }
 
+    console.log('[RecorderController] Starting recording for tab:', tabId);
+
     // Initialize database
     await db.init();
 
@@ -356,11 +358,13 @@ export class RecorderController {
     // Update badge to show recording status
     await BadgeManager.setRecording(true);
 
-    // Ensure content script is loaded
-    await this.ensureContentScriptLoaded(tabId);
-
-    // Capture initial screenshot of the starting page
+    // IMPORTANT: Capture initial screenshot BEFORE loading content script
+    // This ensures we capture the page in its pristine state
+    console.log('[RecorderController] Capturing initial page state...');
     await this.captureInitialScreenshot(tabId);
+
+    // Now ensure content script is loaded
+    await this.ensureContentScriptLoaded(tabId);
 
     // Send start recording message to content script
     await this.messageBroker.emit(COMMANDS.START_RECORDING, { sessionId }, tabId);
@@ -368,7 +372,7 @@ export class RecorderController {
     // Save state
     await this.saveState();
 
-    console.log('[RecorderController] Recording started:', sessionId);
+    console.log('[RecorderController] Recording started successfully:', sessionId);
   }
 
   /**
@@ -584,56 +588,75 @@ export class RecorderController {
 
   /**
    * Capture initial screenshot when recording starts
+   * This captures the page BEFORE any content script modifications
    */
   private async captureInitialScreenshot(tabId: number): Promise<void> {
+    const startTime = Date.now();
+
     try {
-      console.log('[RecorderController] Capturing initial screenshot...');
+      console.log('[RecorderController] 📸 Capturing initial page state...');
 
       // Get current tab info
       const tab = await chrome.tabs.get(tabId);
+
+      if (!tab.url) {
+        throw new Error('Tab URL is not available');
+      }
+
+      console.log('[RecorderController] Tab URL:', tab.url);
 
       // Wait for page to be ready
       const readinessState = await this.waitForPageReadiness(tabId);
 
       console.log(
-        `[RecorderController] Initial page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
+        `[RecorderController] ✓ Initial page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
         readinessState.checks
       );
 
       // Capture screenshot
       const screenshot = await this.visualCaptureService.captureTabScreenshot(tabId);
 
-      if (screenshot && this.currentSessionId) {
-        // Create an initial step to show the starting point
-        const initialStep: RecordedStep = {
-          id: crypto.randomUUID(),
-          sessionId: this.currentSessionId,
-          type: EVENT_TYPES.PAGE_LOAD,
-          selector: 'window',
-          value: tab.url || '',
-          url: tab.url || '',
-          timestamp: Date.now(),
-          metadata: {
-            type: 'initialState',
-            url: tab.url || '',
-            pageReadiness: readinessState,
-            description: 'Initial page state when recording started',
-          },
-          visual: {
-            viewport: screenshot,
-            thumbnail: screenshot,
-          },
-        };
-
-        // Save initial step to database
-        await db.addStep(this.currentSessionId, initialStep);
-        this.stepCount++;
-
-        console.log('[RecorderController] Initial screenshot captured');
+      if (!screenshot) {
+        throw new Error('Failed to capture screenshot - no data returned');
       }
+
+      if (!this.currentSessionId) {
+        throw new Error('No active session ID');
+      }
+
+      // Create an initial step to show the starting point
+      const initialStep: RecordedStep = {
+        id: crypto.randomUUID(),
+        sessionId: this.currentSessionId,
+        type: EVENT_TYPES.PAGE_LOAD,
+        selector: 'window',
+        value: tab.url,
+        url: tab.url,
+        timestamp: Date.now(),
+        metadata: {
+          type: 'initialState',
+          url: tab.url,
+          pageReadiness: readinessState,
+          description: 'Initial page state when recording started',
+          captureTime: Date.now() - startTime,
+        },
+        visual: {
+          viewport: screenshot,
+          thumbnail: screenshot,
+        },
+      };
+
+      // Save initial step to database
+      await db.addStep(this.currentSessionId, initialStep);
+      this.stepCount++;
+
+      const totalTime = Date.now() - startTime;
+      console.log(`[RecorderController] ✓ Initial screenshot captured successfully (${totalTime}ms total)`);
     } catch (error) {
-      console.error('[RecorderController] Error capturing initial screenshot:', error);
-      // Don't fail recording if initial screenshot fails
+      const totalTime = Date.now() - startTime;
+      console.error(`[RecorderController] ✗ Error capturing initial screenshot (${totalTime}ms):`, error);
+      // Don't fail recording if initial screenshot fails - this is non-critical
+      // Recording will continue without the initial screenshot
     }
   }
 

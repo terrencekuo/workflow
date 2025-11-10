@@ -24,6 +24,7 @@ export default function Popup() {
   });
   const [sessionTitle, setSessionTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     loadRecordingState();
@@ -43,6 +44,7 @@ export default function Popup() {
     }
 
     setError(null);
+    setIsStarting(true);
 
     const metadata: SessionMetadata = {
       title: sessionTitle,
@@ -53,9 +55,12 @@ export default function Popup() {
     const response = await sendMessage(COMMANDS.START_RECORDING, { metadata });
 
     if (response.success) {
-      // Close the popup after starting recording
-      window.close();
+      // Give a brief moment for visual feedback before closing
+      setTimeout(() => {
+        window.close();
+      }, 100);
     } else {
+      setIsStarting(false);
       setError(response.error || 'Failed to start recording');
     }
   };
@@ -145,14 +150,27 @@ export default function Popup() {
               onChange={(e) => setSessionTitle(e.target.value)}
               placeholder="e.g., User Registration Flow"
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isStarting}
             />
           </div>
 
           <button
             onClick={handleStartRecording}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors"
+            disabled={isStarting}
+            className={`w-full py-2 px-4 text-white font-semibold rounded transition-colors ${
+              isStarting
+                ? 'bg-blue-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
-            Start Recording
+            {isStarting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                Capturing initial state...
+              </span>
+            ) : (
+              'Start Recording'
+            )}
           </button>
         </div>
       )}
