@@ -9,6 +9,8 @@ import type {
 } from '@/shared/types';
 import { MessageBroker } from '@/background/MessageBroker';
 import { VisualCaptureService } from '@/background/VisualCaptureService';
+import { waitForPageReadiness } from '@/background/utils/PageLoadDetector';
+import { BadgeManager } from '@/background/utils/BadgeManager';
 
 export class RecorderController {
   private isRecording = false;
@@ -85,7 +87,7 @@ export class RecorderController {
         this.stepCount = state.stepCount;
 
         // Restore badge state
-        await this.updateBadge(this.isRecording);
+        await BadgeManager.setRecording(this.isRecording);
 
         console.log('[RecorderController] State restored:', state);
       }
@@ -182,7 +184,7 @@ export class RecorderController {
       if (this.shouldCaptureVisual(step.type) && this.currentTabId) {
         try {
           // Use smart detection to wait for page readiness
-          const readinessState = await this.waitForPageReadiness(this.currentTabId);
+          const readinessState = await waitForPageReadiness(this.currentTabId);
 
           console.log(
             `[RecorderController] Page ready for screenshot: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -233,276 +235,6 @@ export class RecorderController {
   }
 
   /**
-   * Wait for page to be ready using smart detection
-   * Injects PageLoadDetector into the content page and waits for result
-   */
-  private async waitForPageReadiness(tabId: number): Promise<any> {
-    try {
-      // Inject and execute the detection script
-      const result = await chrome.scripting.executeScript({
-        target: { tabId },
-        func: async () => {
-          // Inline PageLoadDetector for injection
-          interface PageReadinessState {
-            isReady: boolean;
-            reason: string;
-            duration: number;
-            checks: {
-              domStable: boolean;
-              resourcesLoaded: boolean;
-              noSkeletons: boolean;
-            };
-          }
-
-          class PageLoadDetector {
-            private maxTimeout: number;
-            private domStabilityWait: number;
-            private mutationTimeout: number | null = null;
-            private lastMutationTime: number = 0;
-
-            constructor(maxTimeout = TIMING.PAGE_LOAD_MAX_TIMEOUT, domStabilityWait = TIMING.DOM_STABILITY_WAIT) {
-              this.maxTimeout = maxTimeout;
-              this.domStabilityWait = domStabilityWait;
-            }
-
-            async waitForPageReady(): Promise<PageReadinessState> {
-              const startTime = Date.now();
-              const timeoutPromise = this.createTimeout();
-
-              try {
-                const result = await Promise.race([
-                  this.performAllChecks(startTime),
-                  timeoutPromise,
-                ]);
-                return { ...result, duration: Date.now() - startTime };
-              } catch (error) {
-                return {
-                  isReady: false,
-                  reason: 'Detection error: ' + (error instanceof Error ? error.message : 'Unknown'),
-                  duration: Date.now() - startTime,
-                  checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
-                };
-              }
-            }
-
-            private async performAllChecks(startTime: number): Promise<PageReadinessState> {
-              const checks = { domStable: false, resourcesLoaded: false, noSkeletons: false };
-
-              await this.waitForDOMStability();
-              checks.domStable = true;
-
-              if (Date.now() - startTime >= this.maxTimeout) {
-                return { isReady: false, reason: 'Timeout after DOM stability', duration: Date.now() - startTime, checks };
-              }
-
-              await this.waitForResources();
-              checks.resourcesLoaded = true;
-
-              if (Date.now() - startTime >= this.maxTimeout) {
-                return { isReady: true, reason: 'Resources loaded (timeout before skeleton check)', duration: Date.now() - startTime, checks };
-              }
-
-              await this.waitForSkeletonDisappear();
-              checks.noSkeletons = true;
-
-              return { isReady: true, reason: 'All checks passed', duration: Date.now() - startTime, checks };
-            }
-
-            private createTimeout(): Promise<PageReadinessState> {
-              return new Promise((resolve) => {
-                setTimeout(() => {
-                  resolve({
-                    isReady: true,
-                    reason: 'Max timeout reached',
-                    duration: this.maxTimeout,
-                    checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
-                  });
-                }, this.maxTimeout);
-              });
-            }
-
-            private waitForDOMStability(): Promise<void> {
-              return new Promise((resolve) => {
-                let mutationCount = 0;
-                this.lastMutationTime = Date.now();
-
-                const observer = new MutationObserver(() => {
-                  mutationCount++;
-                  this.lastMutationTime = Date.now();
-
-                  if (this.mutationTimeout) clearTimeout(this.mutationTimeout);
-
-                  this.mutationTimeout = window.setTimeout(() => {
-                    observer.disconnect();
-                    resolve();
-                  }, this.domStabilityWait);
-                });
-
-                observer.observe(document.body || document.documentElement, {
-                  childList: true,
-                  subtree: true,
-                  attributes: true,
-                  characterData: true,
-                });
-
-                setTimeout(() => {
-                  if (Date.now() - this.lastMutationTime >= this.domStabilityWait) {
-                    observer.disconnect();
-                    if (this.mutationTimeout) clearTimeout(this.mutationTimeout);
-                    resolve();
-                  }
-                }, this.domStabilityWait);
-              });
-            }
-
-            private async waitForResources(): Promise<void> {
-              const resources: HTMLElement[] = [
-                ...Array.from(document.querySelectorAll('img')),
-                ...Array.from(document.querySelectorAll('iframe')),
-                ...Array.from(document.querySelectorAll('video')),
-              ];
-
-              if (resources.length === 0) return;
-
-              const promises: Promise<void>[] = [];
-
-              for (const resource of resources) {
-                if (resource instanceof HTMLImageElement) {
-                  if (resource.complete && resource.naturalHeight > 0) continue;
-                } else if (resource instanceof HTMLIFrameElement) {
-                  try {
-                    if (resource.contentDocument?.readyState === 'complete') continue;
-                  } catch (e) {
-                    continue;
-                  }
-                } else if (resource instanceof HTMLVideoElement) {
-                  if (resource.readyState >= 2) continue;
-                }
-
-                promises.push(
-                  new Promise<void>((resolve) => {
-                    const timeout = setTimeout(() => resolve(), TIMING.RESOURCE_LOAD_TIMEOUT);
-                    const onLoad = () => {
-                      clearTimeout(timeout);
-                      resolve();
-                    };
-                    resource.addEventListener('load', onLoad, { once: true });
-                    resource.addEventListener('error', onLoad, { once: true });
-                  })
-                );
-              }
-
-              await Promise.all(promises);
-            }
-
-            private async waitForSkeletonDisappear(): Promise<void> {
-              const maxWait = TIMING.SKELETON_MAX_WAIT;
-              const checkInterval = TIMING.SKELETON_CHECK_INTERVAL;
-              const startTime = Date.now();
-
-              return new Promise((resolve) => {
-                const checkSkeletons = () => {
-                  const hasSkeletons = this.hasSkeletonElements();
-
-                  if (!hasSkeletons || Date.now() - startTime >= maxWait) {
-                    resolve();
-                    return;
-                  }
-
-                  setTimeout(checkSkeletons, checkInterval);
-                };
-
-                checkSkeletons();
-              });
-            }
-
-            private hasSkeletonElements(): boolean {
-              const patterns = [
-                'skeleton', 'loading', 'shimmer', 'placeholder-glow', 'placeholder-wave',
-                'content-loader', 'skeleton-loader', 'loading-skeleton', 'pulse', 'animate-pulse',
-                'spinner', 'loader', 'loading-spinner', 'spin', 'rotating',
-              ];
-
-              for (const pattern of patterns) {
-                const elements = document.querySelectorAll(`[class*="${pattern}" i], [data-loading*="${pattern}" i]`);
-                for (const element of Array.from(elements)) {
-                  if (this.isElementVisible(element as HTMLElement)) return true;
-                }
-              }
-
-              const busyElements = document.querySelectorAll('[aria-busy="true"]');
-              for (const element of Array.from(busyElements)) {
-                if (this.isElementVisible(element as HTMLElement)) return true;
-              }
-
-              const loadingElements = document.querySelectorAll('[data-loading="true"]');
-              for (const element of Array.from(loadingElements)) {
-                if (this.isElementVisible(element as HTMLElement)) return true;
-              }
-
-              return false;
-            }
-
-            private isElementVisible(element: HTMLElement): boolean {
-              if (!document.body.contains(element)) return false;
-
-              const style = window.getComputedStyle(element);
-              if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-                return false;
-              }
-
-              const rect = element.getBoundingClientRect();
-              if (rect.width === 0 || rect.height === 0) return false;
-
-              return true;
-            }
-
-            cleanup(): void {
-              if (this.mutationTimeout) {
-                clearTimeout(this.mutationTimeout);
-                this.mutationTimeout = null;
-              }
-            }
-          }
-
-          // Execute detection
-          const detector = new PageLoadDetector(TIMING.PAGE_LOAD_MAX_TIMEOUT, TIMING.DOM_STABILITY_WAIT);
-          try {
-            const result = await detector.waitForPageReady();
-            detector.cleanup();
-            return result;
-          } catch (error) {
-            detector.cleanup();
-            throw error;
-          }
-        },
-      });
-
-      if (result && result[0] && result[0].result) {
-        return result[0].result;
-      }
-
-      // Fallback if detection fails
-      return {
-        isReady: true,
-        reason: 'Detection script failed, using fallback',
-        duration: 0,
-        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
-      };
-    } catch (error) {
-      console.error('[RecorderController] Error during page readiness detection:', error);
-      // Fallback to small delay if detection fails
-      await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
-      return {
-        isReady: true,
-        reason: 'Detection error, used fallback delay',
-        duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
-        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
-      };
-    }
-  }
-
-  /**
    * Handle manual screenshot capture command
    */
   private async handleCaptureScreenshot(): Promise<MessageResponse> {
@@ -517,7 +249,7 @@ export class RecorderController {
       const tab = await chrome.tabs.get(this.currentTabId);
 
       // Wait for page to be ready
-      const readinessState = await this.waitForPageReadiness(this.currentTabId);
+      const readinessState = await waitForPageReadiness(this.currentTabId);
 
       console.log(
         `[RecorderController] Manual capture page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -622,7 +354,7 @@ export class RecorderController {
     this.stepCount = 0;
 
     // Update badge to show recording status
-    await this.updateBadge(true);
+    await BadgeManager.setRecording(true);
 
     // Ensure content script is loaded
     await this.ensureContentScriptLoaded(tabId);
@@ -658,7 +390,7 @@ export class RecorderController {
     this.stepCount = 0;
 
     // Update badge to show idle status
-    await this.updateBadge(false);
+    await BadgeManager.setRecording(false);
 
     // Save state
     await this.saveState();
@@ -757,7 +489,7 @@ export class RecorderController {
       console.log('[RecorderController] Capturing page load for:', url);
 
       // Wait for page to be ready with smart detection
-      const readinessState = await this.waitForPageReadiness(tabId);
+      const readinessState = await waitForPageReadiness(tabId);
 
       console.log(
         `[RecorderController] Page load ready: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -824,7 +556,7 @@ export class RecorderController {
       const tab = await chrome.tabs.get(tabId);
 
       // Wait for page to be ready
-      const readinessState = await this.waitForPageReadiness(tabId);
+      const readinessState = await waitForPageReadiness(tabId);
 
       console.log(
         `[RecorderController] Initial page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -868,21 +600,4 @@ export class RecorderController {
     }
   }
 
-  /**
-   * Update extension badge to show recording status
-   */
-  private async updateBadge(isRecording: boolean): Promise<void> {
-    try {
-      if (isRecording) {
-        await chrome.action.setBadgeText({ text: 'REC' });
-        await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' }); // Red
-        await chrome.action.setTitle({ title: 'Recording in progress - Click to stop' });
-      } else {
-        await chrome.action.setBadgeText({ text: '' });
-        await chrome.action.setTitle({ title: 'Workflow Recorder - Click to start' });
-      }
-    } catch (error) {
-      console.error('[RecorderController] Error updating badge:', error);
-    }
-  }
 }
