@@ -29,6 +29,31 @@ export class RecorderController {
   }
 
   /**
+   * Check if a URL is valid for content script injection and screenshot capture
+   * Chrome doesn't allow extensions to interact with certain pages
+   */
+  private isValidUrl(url: string | undefined): boolean {
+    if (!url) return false;
+    
+    // List of restricted URL schemes/patterns
+    const restrictedPatterns = [
+      /^chrome:\/\//i,
+      /^chrome-extension:\/\//i,
+      /^about:/i,
+      /^edge:\/\//i,
+      /^brave:\/\//i,
+      /^opera:\/\//i,
+      /^vivaldi:\/\//i,
+      /^data:/i,
+      /^file:\/\//i,
+      /^view-source:/i,
+      /chrome\.google\.com\/webstore/i,
+    ];
+
+    return !restrictedPatterns.some(pattern => pattern.test(url));
+  }
+
+  /**
    * Set up message handlers
    */
   private setupMessageHandlers(): void {
@@ -55,6 +80,13 @@ export class RecorderController {
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
         console.log('[RecorderController] Tab updated:', tabId, changeInfo);
+        
+        // Check if this is a valid URL for extension interaction
+        if (!this.isValidUrl(tab.url)) {
+          console.warn('[RecorderController] Skipping restricted URL:', tab.url);
+          return;
+        }
+
         await this.ensureContentScriptLoaded(tabId);
 
         // Capture the final loaded state after navigation
@@ -344,6 +376,12 @@ export class RecorderController {
 
     console.log('[RecorderController] Starting recording for tab:', tabId);
 
+    // Get tab info and validate URL
+    const tab = await chrome.tabs.get(tabId);
+    if (!this.isValidUrl(tab.url)) {
+      throw new Error(`Cannot record on restricted pages. Please navigate to a regular website.\nCurrent URL: ${tab.url}`);
+    }
+
     // Initialize database
     await db.init();
 
@@ -438,6 +476,14 @@ export class RecorderController {
    */
   async ensureContentScriptLoaded(tabId: number): Promise<void> {
     try {
+      // Get tab info to check URL
+      const tab = await chrome.tabs.get(tabId);
+      
+      if (!this.isValidUrl(tab.url)) {
+        console.warn('[RecorderController] Cannot inject content script into restricted URL:', tab.url);
+        return;
+      }
+
       // Try to ping the content script
       const response = await this.messageBroker.emit(COMMANDS.PING, {}, tabId);
 
@@ -485,6 +531,18 @@ export class RecorderController {
    */
   private async waitForPageReadiness(tabId: number): Promise<PageReadinessState> {
     try {
+      // Check if tab URL is valid before trying to communicate
+      const tab = await chrome.tabs.get(tabId);
+      if (!this.isValidUrl(tab.url)) {
+        console.warn('[RecorderController] Cannot detect page readiness on restricted URL:', tab.url);
+        return {
+          isReady: true,
+          reason: 'Restricted URL, skipped detection',
+          duration: 0,
+          checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+        };
+      }
+
       const response = await this.messageBroker.emit(
         COMMANDS.DETECT_PAGE_READINESS,
         {},
@@ -529,6 +587,12 @@ export class RecorderController {
     try {
       console.log('[RecorderController] Capturing page load for:', url);
 
+      // Check if URL is valid for screenshot capture
+      if (!this.isValidUrl(url)) {
+        console.warn('[RecorderController] Skipping page load capture for restricted URL:', url);
+        return;
+      }
+
       // Wait for page to be ready with smart detection
       const readinessState = await this.waitForPageReadiness(tabId);
 
@@ -561,6 +625,8 @@ export class RecorderController {
           viewport: screenshot,
           thumbnail: screenshot,
         };
+      } else {
+        console.warn('[RecorderController] Page load captured without screenshot');
       }
 
       // Save to database
@@ -570,7 +636,9 @@ export class RecorderController {
 
       console.log('[RecorderController] Page load step recorded:', url);
     } catch (error) {
-      console.error('[RecorderController] Error capturing page load step:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[RecorderController] Error capturing page load step:', errorMessage, error);
+      // Don't throw - page load capture is non-critical
     }
   }
 

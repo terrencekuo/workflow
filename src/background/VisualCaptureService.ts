@@ -14,6 +14,16 @@ export class VisualCaptureService {
     let originalZoom: number | null = null;
 
     try {
+      // Get tab info to check if screenshot is possible
+      const tab = await chrome.tabs.get(tabId);
+      
+      // Check if tab is in a capturable state
+      if (!tab.active) {
+        console.warn('[VisualCapture] Tab is not active, switching to it first');
+        await chrome.tabs.update(tabId, { active: true });
+        await this.sleep(100); // Brief wait for tab switch
+      }
+
       // Get current zoom level
       originalZoom = await chrome.tabs.getZoom(tabId);
 
@@ -33,9 +43,21 @@ export class VisualCaptureService {
         format: 'png',
       });
 
+      console.log('[VisualCapture] Screenshot captured successfully');
       return dataUrl;
     } catch (error) {
-      console.error('[VisualCapture] Failed to capture tab screenshot:', error);
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('Cannot access') || error.message.includes('activeTab')) {
+          console.error('[VisualCapture] Cannot capture screenshot - restricted page or insufficient permissions');
+        } else if (error.message.includes('No active web contents')) {
+          console.error('[VisualCapture] Cannot capture screenshot - no active web contents');
+        } else {
+          console.error('[VisualCapture] Failed to capture tab screenshot:', error.message);
+        }
+      } else {
+        console.error('[VisualCapture] Failed to capture tab screenshot:', error);
+      }
       return null;
     } finally {
       // Always restore original zoom level
