@@ -3,11 +3,9 @@ import type { MessageHandler, MessagePayload, MessageResponse } from '@/shared/t
 
 export class MessageBroker {
   private listeners: Map<string, Set<MessageHandler>> = new Map();
-  private ports: Map<number, chrome.runtime.Port> = new Map();
 
   constructor() {
     this.setupMessageListener();
-    this.setupPortListener();
   }
 
   /**
@@ -30,32 +28,6 @@ export class MessageBroker {
     });
 
     console.log('[MessageBroker] Message listener initialized');
-  }
-
-  /**
-   * Set up port connection listener for persistent connections
-   */
-  private setupPortListener(): void {
-    chrome.runtime.onConnect.addListener((port) => {
-      console.log('[MessageBroker] Port connected:', port.name);
-
-      // Store port reference (if it's from a tab)
-      if (port.sender?.tab?.id) {
-        this.ports.set(port.sender.tab.id, port);
-      }
-
-      port.onDisconnect.addListener(() => {
-        console.log('[MessageBroker] Port disconnected:', port.name);
-        if (port.sender?.tab?.id) {
-          this.ports.delete(port.sender.tab.id);
-        }
-      });
-
-      port.onMessage.addListener(async (message: MessagePayload) => {
-        const response = await this.handleMessage(message, port.sender);
-        port.postMessage(response);
-      });
-    });
   }
 
   /**
@@ -165,25 +137,5 @@ export class MessageBroker {
     } catch (error) {
       console.error('[MessageBroker] Error broadcasting message:', error);
     }
-  }
-
-  /**
-   * Send a message via port connection (if available)
-   */
-  async sendViaPort(tabId: number, command: string, data?: any): Promise<void> {
-    const port = this.ports.get(tabId);
-    if (port) {
-      const message: MessagePayload = { command, data };
-      port.postMessage(message);
-    } else {
-      console.warn('[MessageBroker] No port connection for tab:', tabId);
-    }
-  }
-
-  /**
-   * Check if a tab has an active port connection
-   */
-  hasPortConnection(tabId: number): boolean {
-    return this.ports.has(tabId);
   }
 }
