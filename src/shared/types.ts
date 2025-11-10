@@ -92,6 +92,7 @@ export interface Session {
   steps: RecordedStep[];
   createdAt: number;
   updatedAt: number;
+  stepCount?: number; // Optional: used when returning lightweight session lists
 }
 
 export interface MessagePayload {

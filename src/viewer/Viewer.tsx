@@ -114,7 +114,7 @@ export default function Viewer() {
                     )}
                     <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                       <div>
-                        <span className="font-medium">Steps:</span> {session.steps.length}
+                        <span className="font-medium">Steps:</span> {session.stepCount ?? session.steps.length}
                       </div>
                       <div>
                         <span className="font-medium">Created:</span> {formatDate(session.createdAt)}

@@ -157,7 +157,8 @@ export class DB {
   }
 
   /**
-   * Get all sessions
+   * Get all sessions (metadata only, without step details)
+   * This is much lighter for listing sessions
    */
   async getAllSessions(): Promise<Session[]> {
     const db = await this.ensureInit();
@@ -171,7 +172,16 @@ export class DB {
         const sessions = request.result as Session[];
         // Sort by updatedAt descending
         sessions.sort((a, b) => b.updatedAt - a.updatedAt);
-        resolve(sessions);
+
+        // Return sessions with steps array replaced by just the count
+        // This avoids sending massive screenshot data over chrome.runtime.sendMessage
+        const lightSessions = sessions.map(session => ({
+          ...session,
+          steps: [], // Remove step details to avoid message size limits
+          stepCount: session.steps.length, // Add step count for display
+        }));
+
+        resolve(lightSessions as Session[]);
       };
 
       request.onerror = () => {
