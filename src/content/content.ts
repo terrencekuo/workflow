@@ -5,11 +5,8 @@ import { Recorder } from '@/content/Recorder';
 
 console.log('[Content] Content script loaded');
 
-// Initialize recorder with configuration
-const recorder = new Recorder({
-  captureHovers: false, // Disable hover capture by default for performance
-  hoverDebounceMs: 500,
-});
+// Initialize recorder
+const recorder = new Recorder();
 
 /**
  * Send message to background script

@@ -2,14 +2,8 @@ import { COMMANDS, EVENT_TYPES } from '@/shared/constants';
 import type { RecordedStep } from '@/shared/types';
 import { DOMAnalyzer } from '@/content/DOMAnalyzer';
 
-interface RecorderConfig {
-  captureHovers: boolean;
-  hoverDebounceMs: number;
-}
-
 /**
  * Recorder class - Captures user interactions and DOM events
- * Implements intelligent event debouncing for hover events
  */
 export class Recorder {
   private isRecording = false;
@@ -20,15 +14,9 @@ export class Recorder {
     handler: EventListener;
     options?: boolean | AddEventListenerOptions;
   }> = [];
-  private config: RecorderConfig;
-  private hoverTimeout: number | null = null;
   private domAnalyzer: DOMAnalyzer;
 
-  constructor(config?: Partial<RecorderConfig>) {
-    this.config = {
-      captureHovers: config?.captureHovers ?? false,
-      hoverDebounceMs: config?.hoverDebounceMs ?? 500,
-    };
+  constructor() {
     this.domAnalyzer = new DOMAnalyzer();
   }
 
@@ -79,11 +67,6 @@ export class Recorder {
     // Navigation
     this.addListener(window, 'popstate', this.handleNavigation.bind(this));
 
-    // Hover events (optional)
-    if (this.config.captureHovers) {
-      this.addListener(document, 'mouseover', this.handleHover.bind(this), true);
-    }
-
     // Keyboard events
     this.addListener(document, 'keydown', this.handleKeyDown.bind(this), true);
 
@@ -98,11 +81,6 @@ export class Recorder {
       element.removeEventListener(event, handler, options);
     });
     this.eventListeners = [];
-
-    if (this.hoverTimeout) {
-      window.clearTimeout(this.hoverTimeout);
-      this.hoverTimeout = null;
-    }
 
     console.log('[Recorder] Event listeners removed');
   }
@@ -241,34 +219,6 @@ export class Recorder {
         method: target.method,
       },
     });
-  }
-
-  /**
-   * Handle hover events with debouncing
-   */
-  private handleHover(event: Event): void {
-    const target = event.target as HTMLElement;
-
-    if (!this.shouldCaptureElement(target)) {
-      return;
-    }
-
-    if (this.hoverTimeout) {
-      window.clearTimeout(this.hoverTimeout);
-    }
-
-    this.hoverTimeout = window.setTimeout(() => {
-      this.recordStep({
-        type: EVENT_TYPES.HOVER,
-        selector: this.generateSelector(target),
-        value: null,
-        timestamp: Date.now(),
-        metadata: {
-          tagName: target.tagName.toLowerCase(),
-          text: this.getElementText(target),
-        },
-      });
-    }, this.config.hoverDebounceMs);
   }
 
   /**
