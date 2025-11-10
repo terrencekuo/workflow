@@ -26,6 +26,9 @@ export const COMMANDS = {
   GET_RECORDING_STATE: 'get_recording_state',
   CONTENT_SCRIPT_READY: 'content_script_ready',
 
+  // Page detection
+  DETECT_PAGE_READINESS: 'detect_page_readiness',
+
   // Health check
   PING: 'ping',
   PONG: 'pong',

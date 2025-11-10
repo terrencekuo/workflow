@@ -2,11 +2,13 @@
 import { COMMANDS } from '@/shared/constants';
 import type { MessagePayload, MessageResponse } from '@/shared/types';
 import { Recorder } from '@/content/Recorder';
+import { PageLoadDetector } from '@/content/PageLoadDetector';
 
 console.log('[Content] Content script loaded');
 
-// Initialize recorder
+// Initialize recorder and page detector
 const recorder = new Recorder();
+const pageDetector = new PageLoadDetector();
 
 /**
  * Send message to background script
@@ -45,6 +47,22 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, _sender, sendResp
       console.log('[Content] Stopped recording');
       sendResponse({ success: true });
       break;
+
+    case COMMANDS.DETECT_PAGE_READINESS:
+      // Run page readiness detection asynchronously
+      pageDetector.waitForPageReady()
+        .then((readinessState) => {
+          console.log('[Content] Page readiness detected:', readinessState);
+          sendResponse({ success: true, data: readinessState });
+        })
+        .catch((error) => {
+          console.error('[Content] Page readiness detection failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Page readiness detection failed'
+          });
+        });
+      return true; // Keep channel open for async response
 
     case COMMANDS.PING:
       sendResponse({ success: true, data: 'pong' });

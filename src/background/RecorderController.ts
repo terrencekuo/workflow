@@ -6,10 +6,10 @@ import type {
   RecordedStep,
   SessionMetadata,
   MessageResponse,
+  PageReadinessState,
 } from '@/shared/types';
 import { MessageBroker } from '@/background/MessageBroker';
 import { VisualCaptureService } from '@/background/VisualCaptureService';
-import { waitForPageReadiness } from '@/background/utils/PageLoadDetector';
 import { BadgeManager } from '@/background/utils/BadgeManager';
 
 export class RecorderController {
@@ -184,7 +184,7 @@ export class RecorderController {
       if (this.shouldCaptureVisual(step.type) && this.currentTabId) {
         try {
           // Use smart detection to wait for page readiness
-          const readinessState = await waitForPageReadiness(this.currentTabId);
+          const readinessState = await this.waitForPageReadiness(this.currentTabId);
 
           console.log(
             `[RecorderController] Page ready for screenshot: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -249,7 +249,7 @@ export class RecorderController {
       const tab = await chrome.tabs.get(this.currentTabId);
 
       // Wait for page to be ready
-      const readinessState = await waitForPageReadiness(this.currentTabId);
+      const readinessState = await this.waitForPageReadiness(this.currentTabId);
 
       console.log(
         `[RecorderController] Manual capture page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -477,6 +477,43 @@ export class RecorderController {
   }
 
   /**
+   * Wait for page readiness by requesting detection from content script
+   */
+  private async waitForPageReadiness(tabId: number): Promise<PageReadinessState> {
+    try {
+      const response = await this.messageBroker.emit(
+        COMMANDS.DETECT_PAGE_READINESS,
+        {},
+        tabId
+      );
+
+      if (response.success && response.data) {
+        return response.data as PageReadinessState;
+      }
+
+      // Fallback if detection fails
+      console.warn('[RecorderController] Page readiness detection failed, using fallback');
+      await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
+      return {
+        isReady: true,
+        reason: 'Detection failed, used fallback delay',
+        duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
+        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+      };
+    } catch (error) {
+      console.error('[RecorderController] Error during page readiness detection:', error);
+      // Fallback to small delay if detection fails
+      await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
+      return {
+        isReady: true,
+        reason: 'Detection error, used fallback delay',
+        duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
+        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+      };
+    }
+  }
+
+  /**
    * Capture a pageLoad step when navigation completes
    * This ensures we get the final state of the loaded page
    */
@@ -489,7 +526,7 @@ export class RecorderController {
       console.log('[RecorderController] Capturing page load for:', url);
 
       // Wait for page to be ready with smart detection
-      const readinessState = await waitForPageReadiness(tabId);
+      const readinessState = await this.waitForPageReadiness(tabId);
 
       console.log(
         `[RecorderController] Page load ready: ${readinessState.reason} (${readinessState.duration}ms)`,
@@ -556,7 +593,7 @@ export class RecorderController {
       const tab = await chrome.tabs.get(tabId);
 
       // Wait for page to be ready
-      const readinessState = await waitForPageReadiness(tabId);
+      const readinessState = await this.waitForPageReadiness(tabId);
 
       console.log(
         `[RecorderController] Initial page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
