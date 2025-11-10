@@ -79,13 +79,17 @@ export class RecorderController {
     // Track when tabs are updated (URL changes)
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
-        console.log('[RecorderController] Tab updated:', tabId, changeInfo);
-
+        console.log('[RecorderController] Tab updated:', tabId, 'URL:', tab.url);
+        
         // Check if this is a valid URL for extension interaction
         if (!this.isValidUrl(tab.url)) {
           console.warn('[RecorderController] Skipping restricted URL:', tab.url);
           return;
         }
+
+        // Give the page a moment to settle after 'complete' status
+        // This helps ensure DOM is ready before we inject content script
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
         await this.ensureContentScriptLoaded(tabId);
 
@@ -473,12 +477,13 @@ export class RecorderController {
 
   /**
    * Ensure content script is loaded in a tab
+   * Uses polling to verify content script is actually responsive
    */
   async ensureContentScriptLoaded(tabId: number): Promise<void> {
     try {
       // Get tab info to check URL
       const tab = await chrome.tabs.get(tabId);
-
+      
       if (!this.isValidUrl(tab.url)) {
         console.warn('[RecorderController] Cannot inject content script into restricted URL:', tab.url);
         return;
@@ -504,8 +509,25 @@ export class RecorderController {
 
       console.log('[RecorderController] Content script injected into tab:', tabId);
 
-      // Wait a bit for the content script to initialize
-      await new Promise(resolve => setTimeout(resolve, TIMING.CONTENT_SCRIPT_INIT_WAIT));
+      // Wait for content script to initialize with polling
+      const maxWait = 3000; // 3 seconds max
+      const pollInterval = 200; // Check every 200ms
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < maxWait) {
+        try {
+          const pingResponse = await this.messageBroker.emit(COMMANDS.PING, {}, tabId);
+          if (pingResponse.success) {
+            console.log(`[RecorderController] Content script ready after ${Date.now() - startTime}ms`);
+            return;
+          }
+        } catch (error) {
+          // Ignore, will retry
+        }
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+
+      console.warn('[RecorderController] Content script may not be fully initialized after timeout');
     } catch (error) {
       console.error('[RecorderController] Error injecting content script:', error);
       throw error;
@@ -528,9 +550,9 @@ export class RecorderController {
 
   /**
    * Wait for page readiness by requesting detection from content script
-   * Gracefully falls back to simple delay if content script is not available
+   * Uses retry logic to handle content script initialization during page loads
    */
-  private async waitForPageReadiness(tabId: number): Promise<PageReadinessState> {
+  private async waitForPageReadiness(tabId: number, maxRetries: number = 3): Promise<PageReadinessState> {
     try {
       // Check if tab URL is valid before trying to communicate
       const tab = await chrome.tabs.get(tabId);
@@ -544,38 +566,41 @@ export class RecorderController {
         };
       }
 
-      // First check if content script is loaded
-      const pingResponse = await this.messageBroker.emit(COMMANDS.PING, {}, tabId);
-      
-      if (!pingResponse.success) {
-        // Content script not available, use fallback
-        console.warn('[RecorderController] Content script not available, using fallback delay');
-        await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
-        return {
-          isReady: true,
-          reason: 'Content script not loaded, used fallback delay',
-          duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
-          checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
-        };
+      // Try to communicate with content script with retries
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Check if content script is loaded
+          const pingResponse = await this.messageBroker.emit(COMMANDS.PING, {}, tabId);
+
+          if (pingResponse.success) {
+            // Content script is available, use smart detection
+            const response = await this.messageBroker.emit(
+              COMMANDS.DETECT_PAGE_READINESS,
+              {},
+              tabId
+            );
+
+            if (response.success && response.data) {
+              return response.data as PageReadinessState;
+            }
+          }
+        } catch (error) {
+          // Ignore errors on retry attempts
+          console.debug(`[RecorderController] Retry ${attempt + 1}/${maxRetries} failed, content script may be initializing`);
+        }
+
+        // Wait before retry (content script might be loading)
+        if (attempt < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
       }
 
-      // Content script is available, use smart detection
-      const response = await this.messageBroker.emit(
-        COMMANDS.DETECT_PAGE_READINESS,
-        {},
-        tabId
-      );
-
-      if (response.success && response.data) {
-        return response.data as PageReadinessState;
-      }
-
-      // Fallback if detection fails
-      console.warn('[RecorderController] Page readiness detection failed, using fallback');
+      // All retries failed, use fallback
+      console.warn('[RecorderController] Content script not available after retries, using fallback delay');
       await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
       return {
         isReady: true,
-        reason: 'Detection failed, used fallback delay',
+        reason: 'Content script not available, used fallback delay',
         duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
         checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
       };
@@ -679,13 +704,13 @@ export class RecorderController {
    */
   private async captureInitialScreenshot(tabId: number): Promise<void> {
     const startTime = Date.now();
-    
+
     try {
       console.log('[RecorderController] 📸 Capturing initial page state...');
 
       // Get current tab info
       const tab = await chrome.tabs.get(tabId);
-      
+
       if (!tab.url) {
         throw new Error('Tab URL is not available');
       }
@@ -694,7 +719,7 @@ export class RecorderController {
 
       // Simple wait for initial screenshot (content script not loaded yet)
       // Use a brief delay to ensure page has rendered
-      const waitTime = 500; // Brief wait for page stability
+      const waitTime = 50; // Brief wait for page stability
       await new Promise((resolve) => setTimeout(resolve, waitTime));
 
       console.log(`[RecorderController] ✓ Waited ${waitTime}ms for initial page stability`);

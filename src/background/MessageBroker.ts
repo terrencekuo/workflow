@@ -88,7 +88,7 @@ export class MessageBroker {
    */
   async emit(command: string, data?: any, tabId?: number): Promise<MessageResponse> {
     const message: MessagePayload = { command, data };
-    const timeout = 5000; // 5 second timeout
+    const timeout = 2000; // 2 second timeout (reduced since we have retry logic)
 
     if (tabId !== undefined) {
       try {
@@ -96,21 +96,27 @@ export class MessageBroker {
         const response = await Promise.race([
           chrome.tabs.sendMessage(tabId, message),
           new Promise<MessageResponse>((_, reject) => 
-            setTimeout(() => reject(new Error('Message timeout - content script may not be loaded')), timeout)
+            setTimeout(() => reject(new Error('Message timeout')), timeout)
           )
         ]);
         return response;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
         
-        // Don't log connection errors as errors if they're expected
+        // Don't log expected errors during page lifecycle
         if (errorMessage.includes('Receiving end does not exist') || 
-            errorMessage.includes('Could not establish connection')) {
-          console.debug('[MessageBroker] Content script not available in tab:', tabId);
-        } else {
-          console.error('[MessageBroker] Error sending message to tab:', error);
+            errorMessage.includes('Could not establish connection') ||
+            errorMessage.includes('message channel closed') ||
+            errorMessage.includes('Message timeout')) {
+          // These are expected during navigation/initialization
+          return {
+            success: false,
+            error: errorMessage,
+          };
         }
         
+        // Log unexpected errors
+        console.error('[MessageBroker] Unexpected error sending message to tab:', error);
         return {
           success: false,
           error: errorMessage,
