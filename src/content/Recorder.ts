@@ -57,8 +57,7 @@ export class Recorder {
     // Click events
     this.addListener(document, 'click', this.handleClick.bind(this), true);
 
-    // Input events
-    this.addListener(document, 'input', this.handleInput.bind(this), true);
+    // Change events (select, checkbox, radio)
     this.addListener(document, 'change', this.handleChange.bind(this), true);
 
     // Form submission
@@ -66,9 +65,6 @@ export class Recorder {
 
     // Navigation
     this.addListener(window, 'popstate', this.handleNavigation.bind(this));
-
-    // Keyboard events
-    this.addListener(document, 'keydown', this.handleKeyDown.bind(this), true);
 
     console.log('[Recorder] Event listeners setup complete');
   }
@@ -135,33 +131,6 @@ export class Recorder {
   }
 
   /**
-   * Handle input events
-   */
-  private handleInput(event: Event): void {
-    const target = event.target as HTMLInputElement | HTMLTextAreaElement;
-
-    if (!this.shouldCaptureElement(target)) {
-      return;
-    }
-
-    // Mask sensitive data
-    const value = this.shouldMaskValue(target) ? '***MASKED***' : target.value;
-
-    this.recordStep({
-      type: EVENT_TYPES.INPUT,
-      selector: this.generateSelector(target),
-      value,
-      timestamp: Date.now(),
-      metadata: {
-        tagName: target.tagName.toLowerCase(),
-        inputType: target instanceof HTMLInputElement ? target.type : 'textarea',
-        name: target.name,
-        placeholder: target.placeholder,
-      },
-    });
-  }
-
-  /**
    * Handle change events (select, checkbox, radio)
    */
   private handleChange(event: Event): void {
@@ -184,8 +153,8 @@ export class Recorder {
         value = target.value;
         metadata.inputType = 'radio';
       } else {
-        value = this.shouldMaskValue(target) ? '***MASKED***' : target.value;
-        metadata.inputType = target.type;
+        // Skip other input types (text, etc.) - not captured
+        return;
       }
     } else if (target instanceof HTMLSelectElement) {
       value = target.value;
@@ -217,35 +186,6 @@ export class Recorder {
         tagName: 'form',
         action: target.action,
         method: target.method,
-      },
-    });
-  }
-
-  /**
-   * Handle keydown events
-   */
-  private handleKeyDown(event: Event): void {
-    const keyEvent = event as KeyboardEvent;
-    const target = keyEvent.target as HTMLElement;
-
-    // Only capture special keys (Enter, Tab, Escape, etc.)
-    const specialKeys = ['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-    if (!specialKeys.includes(keyEvent.key)) {
-      return;
-    }
-
-    this.recordStep({
-      type: EVENT_TYPES.KEYPRESS,
-      selector: this.generateSelector(target),
-      value: keyEvent.key,
-      timestamp: Date.now(),
-      metadata: {
-        key: keyEvent.key,
-        code: keyEvent.code,
-        ctrlKey: keyEvent.ctrlKey,
-        shiftKey: keyEvent.shiftKey,
-        altKey: keyEvent.altKey,
-        metaKey: keyEvent.metaKey,
       },
     });
   }
@@ -345,24 +285,4 @@ export class Recorder {
     return true;
   }
 
-  /**
-   * Check if input value should be masked (passwords, credit cards, etc.)
-   */
-  private shouldMaskValue(element: HTMLInputElement | HTMLTextAreaElement): boolean {
-    if (element instanceof HTMLInputElement) {
-      // Mask password fields
-      if (element.type === 'password') {
-        return true;
-      }
-
-      // Mask credit card fields (common patterns)
-      const name = element.name.toLowerCase();
-      const id = element.id.toLowerCase();
-      const sensitivePatterns = ['password', 'passwd', 'pwd', 'cc', 'card', 'cvv', 'ssn'];
-
-      return sensitivePatterns.some((pattern) => name.includes(pattern) || id.includes(pattern));
-    }
-
-    return false;
-  }
 }
