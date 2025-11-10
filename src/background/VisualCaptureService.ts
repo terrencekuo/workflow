@@ -3,14 +3,31 @@ import { TIMING } from '@/shared/constants';
 
 /**
  * VisualCaptureService - Intelligent screenshot capture
- * Handles viewport screenshots with zoom normalization
+ * Handles viewport screenshots with zoom normalization and rate limiting
  */
 export class VisualCaptureService {
+  private lastCaptureTime = 0;
+  private readonly MIN_CAPTURE_INTERVAL = 500; // 500ms = 2 captures per second max
+
   /**
-   * Capture screenshot of active tab
+   * Capture screenshot of active tab with rate limiting
    * Handles zoom levels to ensure full viewport is captured
+   *
+   * Chrome enforces MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND (~2/sec)
+   * We rate limit to avoid quota errors
    */
   async captureTabScreenshot(tabId: number, immediate: boolean = false): Promise<string | null> {
+    // Rate limiting: ensure we don't exceed Chrome's quota
+    const now = Date.now();
+    const timeSinceLastCapture = now - this.lastCaptureTime;
+
+    if (timeSinceLastCapture < this.MIN_CAPTURE_INTERVAL) {
+      const waitTime = this.MIN_CAPTURE_INTERVAL - timeSinceLastCapture;
+      console.log(`[VisualCapture] ⏱️ Rate limiting: waiting ${waitTime}ms before capture`);
+      await this.sleep(waitTime);
+    }
+
+    this.lastCaptureTime = Date.now();
     let originalZoom: number | null = null;
 
     try {
