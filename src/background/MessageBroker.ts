@@ -84,20 +84,36 @@ export class MessageBroker {
   }
 
   /**
-   * Send a message to a specific tab
+   * Send a message to a specific tab with timeout protection
    */
   async emit(command: string, data?: any, tabId?: number): Promise<MessageResponse> {
     const message: MessagePayload = { command, data };
+    const timeout = 5000; // 5 second timeout
 
     if (tabId !== undefined) {
       try {
-        const response = await chrome.tabs.sendMessage(tabId, message);
+        // Wrap in a race with timeout to prevent hanging
+        const response = await Promise.race([
+          chrome.tabs.sendMessage(tabId, message),
+          new Promise<MessageResponse>((_, reject) => 
+            setTimeout(() => reject(new Error('Message timeout - content script may not be loaded')), timeout)
+          )
+        ]);
         return response;
       } catch (error) {
-        console.error('[MessageBroker] Error sending message to tab:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+        
+        // Don't log connection errors as errors if they're expected
+        if (errorMessage.includes('Receiving end does not exist') || 
+            errorMessage.includes('Could not establish connection')) {
+          console.debug('[MessageBroker] Content script not available in tab:', tabId);
+        } else {
+          console.error('[MessageBroker] Error sending message to tab:', error);
+        }
+        
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Failed to send message',
+          error: errorMessage,
         };
       }
     } else {

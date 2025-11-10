@@ -34,7 +34,7 @@ export class RecorderController {
    */
   private isValidUrl(url: string | undefined): boolean {
     if (!url) return false;
-    
+
     // List of restricted URL schemes/patterns
     const restrictedPatterns = [
       /^chrome:\/\//i,
@@ -80,7 +80,7 @@ export class RecorderController {
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
         console.log('[RecorderController] Tab updated:', tabId, changeInfo);
-        
+
         // Check if this is a valid URL for extension interaction
         if (!this.isValidUrl(tab.url)) {
           console.warn('[RecorderController] Skipping restricted URL:', tab.url);
@@ -478,7 +478,7 @@ export class RecorderController {
     try {
       // Get tab info to check URL
       const tab = await chrome.tabs.get(tabId);
-      
+
       if (!this.isValidUrl(tab.url)) {
         console.warn('[RecorderController] Cannot inject content script into restricted URL:', tab.url);
         return;
@@ -528,6 +528,7 @@ export class RecorderController {
 
   /**
    * Wait for page readiness by requesting detection from content script
+   * Gracefully falls back to simple delay if content script is not available
    */
   private async waitForPageReadiness(tabId: number): Promise<PageReadinessState> {
     try {
@@ -543,6 +544,22 @@ export class RecorderController {
         };
       }
 
+      // First check if content script is loaded
+      const pingResponse = await this.messageBroker.emit(COMMANDS.PING, {}, tabId);
+      
+      if (!pingResponse.success) {
+        // Content script not available, use fallback
+        console.warn('[RecorderController] Content script not available, using fallback delay');
+        await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
+        return {
+          isReady: true,
+          reason: 'Content script not loaded, used fallback delay',
+          duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
+          checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
+        };
+      }
+
+      // Content script is available, use smart detection
       const response = await this.messageBroker.emit(
         COMMANDS.DETECT_PAGE_READINESS,
         {},
@@ -563,7 +580,8 @@ export class RecorderController {
         checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
       };
     } catch (error) {
-      console.error('[RecorderController] Error during page readiness detection:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[RecorderController] Error during page readiness detection:', errorMessage);
       // Fallback to small delay if detection fails
       await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
       return {
@@ -657,29 +675,29 @@ export class RecorderController {
   /**
    * Capture initial screenshot when recording starts
    * This captures the page BEFORE any content script modifications
+   * Note: Content script is not loaded yet, so we use a simple delay instead of smart detection
    */
   private async captureInitialScreenshot(tabId: number): Promise<void> {
     const startTime = Date.now();
-
+    
     try {
       console.log('[RecorderController] 📸 Capturing initial page state...');
 
       // Get current tab info
       const tab = await chrome.tabs.get(tabId);
-
+      
       if (!tab.url) {
         throw new Error('Tab URL is not available');
       }
 
       console.log('[RecorderController] Tab URL:', tab.url);
 
-      // Wait for page to be ready
-      const readinessState = await this.waitForPageReadiness(tabId);
+      // Simple wait for initial screenshot (content script not loaded yet)
+      // Use a brief delay to ensure page has rendered
+      const waitTime = 500; // Brief wait for page stability
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
 
-      console.log(
-        `[RecorderController] ✓ Initial page ready: ${readinessState.reason} (${readinessState.duration}ms)`,
-        readinessState.checks
-      );
+      console.log(`[RecorderController] ✓ Waited ${waitTime}ms for initial page stability`);
 
       // Capture screenshot
       const screenshot = await this.visualCaptureService.captureTabScreenshot(tabId);
@@ -704,9 +722,9 @@ export class RecorderController {
         metadata: {
           type: 'initialState',
           url: tab.url,
-          pageReadiness: readinessState,
           description: 'Initial page state when recording started',
           captureTime: Date.now() - startTime,
+          note: 'Captured before content script loaded',
         },
         visual: {
           viewport: screenshot,

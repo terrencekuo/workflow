@@ -16,7 +16,7 @@ export class VisualCaptureService {
     try {
       // Get tab info to check if screenshot is possible
       const tab = await chrome.tabs.get(tabId);
-      
+
       // Check if tab is in a capturable state
       if (!tab.active) {
         console.warn('[VisualCapture] Tab is not active, switching to it first');
