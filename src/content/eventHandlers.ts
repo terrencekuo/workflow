@@ -46,8 +46,7 @@ export function handleClick(event: Event, context: EventHandlerContext): void {
     return;
   }
 
-  const strategy = context.domAnalyzer.generateSelectorStrategy(target);
-  const elementContext = context.domAnalyzer.extractElementContext(target);
+  const { selector, alternativeSelectors, elementContext } = context.domAnalyzer.analyzeElement(target);
 
   const metadata = {
     text: getElementText(target),
@@ -62,8 +61,8 @@ export function handleClick(event: Event, context: EventHandlerContext): void {
 
   const step: StepData = {
     type: EVENT_TYPES.CLICK,
-    selector: strategy.primary,
-    alternativeSelectors: strategy.fallbacks,
+    selector,
+    alternativeSelectors,
     elementContext,
     value: null,
     url: window.location.href,
@@ -106,11 +105,13 @@ export function handleChange(event: Event, context: EventHandlerContext): void {
     metadata.selectedIndex = target.selectedIndex;
   }
 
-  const strategy = context.domAnalyzer.generateSelectorStrategy(target);
+  const { selector, alternativeSelectors, elementContext } = context.domAnalyzer.analyzeElement(target);
 
   const step: StepData = {
     type: EVENT_TYPES.CHANGE,
-    selector: strategy.primary,
+    selector,
+    alternativeSelectors,
+    elementContext,
     value,
     timestamp: Date.now(),
     metadata,
@@ -125,7 +126,7 @@ export function handleChange(event: Event, context: EventHandlerContext): void {
 export function handleSubmit(event: Event, context: EventHandlerContext): void {
   const target = event.target as HTMLFormElement;
 
-  const strategy = context.domAnalyzer.generateSelectorStrategy(target);
+  const { selector, alternativeSelectors, elementContext } = context.domAnalyzer.analyzeElement(target);
 
   const metadata = {
     tagName: 'form',
@@ -135,7 +136,9 @@ export function handleSubmit(event: Event, context: EventHandlerContext): void {
 
   const step: StepData = {
     type: EVENT_TYPES.SUBMIT,
-    selector: strategy.primary,
+    selector,
+    alternativeSelectors,
+    elementContext,
     value: null,
     timestamp: Date.now(),
     metadata,
