@@ -72,8 +72,11 @@ export class Recorder {
     // Form submission
     this.addListener(document, 'submit', (e) => handleSubmit(e, context), true);
 
-    // Navigation
+    // Browser back/forward navigation
     this.addListener(window, 'popstate', () => handleNavigation(context));
+
+    // SPA navigation detection (pushState/replaceState)
+    this.wrapHistoryMethods(context);
 
     console.log('[Recorder] Event listeners setup complete');
   }
@@ -136,6 +139,29 @@ export class Recorder {
       .catch((error) => {
         console.error('[Recorder] Failed to send step:', error);
       });
+  }
+
+  /**
+   * Wrap history methods to detect SPA navigation
+   * Intercepts pushState and replaceState to detect URL changes
+   * Note: For full page navigations (link clicks), the background script handles
+   * page load detection via chrome.tabs.onUpdated
+   */
+  private wrapHistoryMethods(context: EventHandlerContext): void {
+    const originalPushState = history.pushState.bind(history);
+    const originalReplaceState = history.replaceState.bind(history);
+
+    history.pushState = (...args) => {
+      originalPushState(...args);
+      console.log('[Recorder] SPA navigation detected (pushState):', window.location.href);
+      handleNavigation(context);
+    };
+
+    history.replaceState = (...args) => {
+      originalReplaceState(...args);
+      console.log('[Recorder] SPA navigation detected (replaceState):', window.location.href);
+      handleNavigation(context);
+    };
   }
 
 }

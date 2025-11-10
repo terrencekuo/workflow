@@ -88,7 +88,7 @@ export class MessageBroker {
    */
   async emit(command: string, data?: any, tabId?: number): Promise<MessageResponse> {
     const message: MessagePayload = { command, data };
-    const timeout = 2000; // 2 second timeout (reduced since we have retry logic)
+    const timeout = 2000; // 2 second timeout
 
     if (tabId !== undefined) {
       try {

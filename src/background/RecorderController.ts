@@ -11,6 +11,7 @@ import type {
 import { MessageBroker } from '@/background/MessageBroker';
 import { VisualCaptureService } from '@/background/VisualCaptureService';
 import { BadgeManager } from '@/background/utils/BadgeManager';
+import { detectPageReadiness } from '@/background/utils/injectablePageDetector';
 
 export class RecorderController {
   private isRecording = false;
@@ -83,27 +84,41 @@ export class RecorderController {
         console.log('[RecorderController] Tab status change:', changeInfo.status, 'URL:', tab.url);
       }
 
-      if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
-        console.log('[RecorderController] ✅ Tab navigation complete:', tabId, 'URL:', tab.url);
-
-        // Check if this is a valid URL for extension interaction
-        if (!this.isValidUrl(tab.url)) {
-          console.warn('[RecorderController] Skipping restricted URL:', tab.url);
-          return;
+      // Handle both 'loading' and 'complete' states to ensure we don't miss page loads
+      if (this.isRecording && tabId === this.currentTabId) {
+        // When page starts loading, log it
+        if (changeInfo.status === 'loading') {
+          console.log('[RecorderController] 🔄 Page loading started:', tab.url);
         }
 
-        // Give the page a moment to settle after 'complete' status
-        // This helps ensure DOM is ready before we inject content script
-        console.log('[RecorderController] Waiting 300ms for page to settle...');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // When page finishes loading, capture the final state
+        if (changeInfo.status === 'complete') {
+          console.log('[RecorderController] ✅ Tab navigation complete:', tabId, 'URL:', tab.url);
 
-        console.log('[RecorderController] Ensuring content script is loaded...');
-        await this.ensureContentScriptLoaded(tabId);
+          // Check if this is a valid URL for extension interaction
+          if (!this.isValidUrl(tab.url)) {
+            console.warn('[RecorderController] Skipping restricted URL:', tab.url);
+            return;
+          }
 
-        // Capture the final loaded state after navigation
-        console.log('[RecorderController] Calling capturePageLoadStep...');
-        await this.capturePageLoadStep(tabId, tab.url || '');
-        console.log('[RecorderController] ✅ Page load handling complete');
+          // Add a small delay to ensure the page is truly ready
+          // This gives the browser time to fully render the page before we start injecting scripts
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          // Ensure content script is loaded for event recording
+          console.log('[RecorderController] Ensuring content script is loaded...');
+          await this.ensureContentScriptLoaded(tabId);
+
+          // Capture the final loaded state after navigation
+          // Note: Page readiness detection is now injected directly, no timing dependencies!
+          console.log('[RecorderController] Calling capturePageLoadStep...');
+          try {
+            await this.capturePageLoadStep(tabId, tab.url || '');
+            console.log('[RecorderController] ✅ Page load handling complete');
+          } catch (error) {
+            console.error('[RecorderController] ❌ Error in capturePageLoadStep:', error);
+          }
+        }
       }
     });
 
@@ -610,12 +625,12 @@ export class RecorderController {
   }
 
   /**
-   * Wait for page readiness by requesting detection from content script
-   * Uses retry logic to handle content script initialization during page loads
+   * Wait for page readiness by injecting detection code directly into the page
+   * This approach has NO dependency on content script timing
    */
-  private async waitForPageReadiness(tabId: number, maxRetries: number = 3): Promise<PageReadinessState> {
+  private async waitForPageReadiness(tabId: number): Promise<PageReadinessState> {
     try {
-      // Check if tab URL is valid before trying to communicate
+      // Check if tab URL is valid before trying to inject
       const tab = await chrome.tabs.get(tabId);
       if (!this.isValidUrl(tab.url)) {
         console.warn('[RecorderController] Cannot detect page readiness on restricted URL:', tab.url);
@@ -627,52 +642,31 @@ export class RecorderController {
         };
       }
 
-      // Try to communicate with content script with retries
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          // Check if content script is loaded
-          const pingResponse = await this.messageBroker.emit(COMMANDS.PING, {}, tabId);
+      console.log('[RecorderController] Injecting page readiness detector...');
 
-          if (pingResponse.success) {
-            // Content script is available, use smart detection
-            const response = await this.messageBroker.emit(
-              COMMANDS.DETECT_PAGE_READINESS,
-              {},
-              tabId
-            );
+      // Inject and execute the page readiness detection function directly in the page
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: detectPageReadiness,
+        world: 'MAIN', // Execute in page context for full DOM access
+      });
 
-            if (response.success && response.data) {
-              return response.data as PageReadinessState;
-            }
-          }
-        } catch (error) {
-          // Ignore errors on retry attempts
-          console.debug(`[RecorderController] Retry ${attempt + 1}/${maxRetries} failed, content script may be initializing`);
-        }
-
-        // Wait before retry (content script might be loading)
-        if (attempt < maxRetries - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
+      if (results && results[0] && results[0].result) {
+        const readinessState = results[0].result as PageReadinessState;
+        console.log('[RecorderController] ✅ Page readiness detection successful:', readinessState);
+        return readinessState;
+      } else {
+        throw new Error('No result returned from page readiness detection');
       }
-
-      // All retries failed, use fallback
-      console.warn('[RecorderController] Content script not available after retries, using fallback delay');
-      await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
-      return {
-        isReady: true,
-        reason: 'Content script not available, used fallback delay',
-        duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
-        checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
-      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('[RecorderController] Error during page readiness detection:', errorMessage);
-      // Fallback to small delay if detection fails
+      console.error('[RecorderController] ❌ Error injecting page readiness detector:', errorMessage);
+
+      // Fallback to simple delay if injection fails
       await new Promise((resolve) => setTimeout(resolve, TIMING.PAGE_READINESS_FALLBACK_DELAY));
       return {
         isReady: true,
-        reason: 'Detection error, used fallback delay',
+        reason: 'Injection failed, used fallback delay',
         duration: TIMING.PAGE_READINESS_FALLBACK_DELAY,
         checks: { domStable: false, resourcesLoaded: false, noSkeletons: false },
       };
@@ -694,6 +688,12 @@ export class RecorderController {
 
     if (!this.isRecording || !this.currentSessionId) {
       console.warn('[RecorderController] ⚠️ Not recording or no session ID, skipping page load capture');
+      return;
+    }
+
+    // Verify we're still recording the correct tab
+    if (tabId !== this.currentTabId) {
+      console.warn('[RecorderController] ⚠️ TabId mismatch, skipping page load capture');
       return;
     }
 
