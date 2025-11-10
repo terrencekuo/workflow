@@ -5,13 +5,11 @@ import { DOMAnalyzer } from '@/content/DOMAnalyzer';
 interface RecorderConfig {
   captureHovers: boolean;
   hoverDebounceMs: number;
-  scrollDebounceMs: number;
-  batchIntervalMs: number;
 }
 
 /**
  * Recorder class - Captures user interactions and DOM events
- * Implements intelligent event batching and debouncing
+ * Implements intelligent event debouncing for hover events
  */
 export class Recorder {
   private isRecording = false;
@@ -24,16 +22,12 @@ export class Recorder {
   }> = [];
   private config: RecorderConfig;
   private hoverTimeout: number | null = null;
-  // private scrollTimeout: number | null = null;
-  // private lastScrollPosition = { x: 0, y: 0 };
   private domAnalyzer: DOMAnalyzer;
 
   constructor(config?: Partial<RecorderConfig>) {
     this.config = {
       captureHovers: config?.captureHovers ?? false,
       hoverDebounceMs: config?.hoverDebounceMs ?? 500,
-      scrollDebounceMs: config?.scrollDebounceMs ?? 300,
-      batchIntervalMs: config?.batchIntervalMs ?? 100,
     };
     this.domAnalyzer = new DOMAnalyzer();
   }
@@ -83,12 +77,7 @@ export class Recorder {
     this.addListener(document, 'submit', this.handleSubmit.bind(this), true);
 
     // Navigation
-    // beforeunload disabled - causes duplicate screenshots during navigation
-    // this.addListener(window, 'beforeunload', this.handleBeforeUnload.bind(this));
     this.addListener(window, 'popstate', this.handleNavigation.bind(this));
-
-    // Scroll events - Disabled: not useful for slideshow demos (clutters the view)
-    // this.addListener(window, 'scroll', this.handleScroll.bind(this), { passive: true });
 
     // Hover events (optional)
     if (this.config.captureHovers) {
@@ -97,10 +86,6 @@ export class Recorder {
 
     // Keyboard events
     this.addListener(document, 'keydown', this.handleKeyDown.bind(this), true);
-
-    // Focus events - Disabled: not useful for slideshow demos
-    // this.addListener(document, 'focus', this.handleFocus.bind(this), true);
-    // this.addListener(document, 'blur', this.handleBlur.bind(this), true);
 
     console.log('[Recorder] Event listeners setup complete');
   }
@@ -118,12 +103,6 @@ export class Recorder {
       window.clearTimeout(this.hoverTimeout);
       this.hoverTimeout = null;
     }
-
-    // Scroll tracking disabled
-    // if (this.scrollTimeout) {
-    //   window.clearTimeout(this.scrollTimeout);
-    //   this.scrollTimeout = null;
-    // }
 
     console.log('[Recorder] Event listeners removed');
   }
@@ -265,42 +244,6 @@ export class Recorder {
   }
 
   /**
-   * Handle scroll events with debouncing
-   * Note: Disabled for slideshow demos (clutters the view)
-   */
-  // private handleScroll(): void {
-  //   if (this.scrollTimeout) {
-  //     window.clearTimeout(this.scrollTimeout);
-  //   }
-
-  //   this.scrollTimeout = window.setTimeout(() => {
-  //     const x = window.scrollX;
-  //     const y = window.scrollY;
-
-  //     // Only record if scroll position changed significantly
-  //     if (
-  //       Math.abs(x - this.lastScrollPosition.x) > 10 ||
-  //       Math.abs(y - this.lastScrollPosition.y) > 10
-  //     ) {
-  //       this.recordStep({
-  //         type: EVENT_TYPES.SCROLL,
-  //         selector: 'window',
-  //         value: null,
-  //         timestamp: Date.now(),
-  //         metadata: {
-  //           scrollX: x,
-  //           scrollY: y,
-  //           scrollHeight: document.documentElement.scrollHeight,
-  //           scrollWidth: document.documentElement.scrollWidth,
-  //         },
-  //       });
-
-  //       this.lastScrollPosition = { x, y };
-  //     }
-  //   }, this.config.scrollDebounceMs);
-  // }
-
-  /**
    * Handle hover events with debouncing
    */
   private handleHover(event: Event): void {
@@ -358,48 +301,6 @@ export class Recorder {
   }
 
   /**
-   * Handle focus events - DISABLED: Not useful for slideshow demos
-   */
-  // private handleFocus(event: Event): void {
-  //   const target = event.target as HTMLElement;
-
-  //   if (!this.shouldCaptureElement(target)) {
-  //     return;
-  //   }
-
-  //   this.recordStep({
-  //     type: EVENT_TYPES.FOCUS,
-  //     selector: this.generateSelector(target),
-  //     value: null,
-  //     timestamp: Date.now(),
-  //     metadata: {
-  //       tagName: target.tagName.toLowerCase(),
-  //     },
-  //   });
-  // }
-
-  /**
-   * Handle blur events - DISABLED: Not useful for slideshow demos
-   */
-  // private handleBlur(event: Event): void {
-  //   const target = event.target as HTMLElement;
-
-  //   if (!this.shouldCaptureElement(target)) {
-  //     return;
-  //   }
-
-  //   this.recordStep({
-  //     type: EVENT_TYPES.BLUR,
-  //     selector: this.generateSelector(target),
-  //     value: null,
-  //     timestamp: Date.now(),
-  //     metadata: {
-  //       tagName: target.tagName.toLowerCase(),
-  //     },
-  //   });
-  // }
-
-  /**
    * Handle navigation events
    */
   private handleNavigation(): void {
@@ -416,22 +317,6 @@ export class Recorder {
       },
     });
   }
-
-  /**
-   * Handle before unload events - DISABLED: Causes duplicate screenshots
-   */
-  // private handleBeforeUnload(): void {
-  //   this.recordStep({
-  //     type: EVENT_TYPES.NAVIGATION,
-  //     selector: 'window',
-  //     value: 'unload',
-  //     timestamp: Date.now(),
-  //     metadata: {
-  //       type: 'unload',
-  //       url: window.location.href,
-  //     },
-  //   });
-  // }
 
   /**
    * Record a step and send to background
@@ -529,19 +414,5 @@ export class Recorder {
     }
 
     return false;
-  }
-
-  /**
-   * Get current recording state
-   */
-  isActive(): boolean {
-    return this.isRecording;
-  }
-
-  /**
-   * Get current session ID
-   */
-  getSessionId(): string | null {
-    return this.sessionId;
   }
 }

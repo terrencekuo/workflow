@@ -9,8 +9,6 @@ console.log('[Content] Content script loaded');
 const recorder = new Recorder({
   captureHovers: false, // Disable hover capture by default for performance
   hoverDebounceMs: 500,
-  scrollDebounceMs: 300,
-  batchIntervalMs: 100,
 });
 
 /**
