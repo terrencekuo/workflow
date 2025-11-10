@@ -2,7 +2,6 @@
 import { db } from '@/shared/db';
 import { COMMANDS, STORAGE_KEYS, EVENT_TYPES, TIMING } from '@/shared/constants';
 import type {
-  TabRecordingState,
   RecordingState,
   RecordedStep,
   SessionMetadata,
@@ -15,7 +14,6 @@ export class RecorderController {
   private isRecording = false;
   private currentSessionId: string | null = null;
   private currentTabId: number | null = null;
-  private tabStates: Map<number, TabRecordingState> = new Map();
   private messageBroker: MessageBroker;
   private visualCaptureService: VisualCaptureService;
   private stepCount = 0;
@@ -64,7 +62,6 @@ export class RecorderController {
 
     // Clean up when tabs are closed
     chrome.tabs.onRemoved.addListener((tabId) => {
-      this.tabStates.delete(tabId);
       if (tabId === this.currentTabId && this.isRecording) {
         console.warn('[RecorderController] Recording tab closed, stopping recording');
         this.stopRecording();

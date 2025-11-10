@@ -35,8 +35,6 @@ export interface ParentContext {
 }
 
 export interface VisualCapture {
-  fullPage?: string;
-  element?: string;
   viewport?: string;
   annotated?: string;
   thumbnail?: string;
@@ -90,13 +88,6 @@ export interface Session {
   updatedAt: number;
 }
 
-export interface TabRecordingState {
-  tabId: number;
-  isRecording: boolean;
-  sessionId: string | null;
-  lastUrl: string;
-}
-
 export interface MessagePayload {
   command: string;
   data?: any;
@@ -119,7 +110,7 @@ export interface SelectorStrategy {
 }
 
 // Recording state
-export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'stopped';
+export type RecordingStatus = 'idle' | 'recording';
 
 export interface RecordingState {
   status: RecordingStatus;

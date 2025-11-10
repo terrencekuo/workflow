@@ -11,22 +11,16 @@ export const COMMANDS = {
   // Recording commands
   START_RECORDING: 'start_recording',
   STOP_RECORDING: 'stop_recording',
-  PAUSE_RECORDING: 'pause_recording',
-  RESUME_RECORDING: 'resume_recording',
 
   // Step commands
   RECORD_STEP: 'record_step',
   CAPTURE_SCREENSHOT: 'capture_screenshot',
-  GET_STEPS: 'get_steps',
   UPDATE_STEP: 'update_step',
-  DELETE_STEP: 'delete_step',
 
   // Session commands
-  CREATE_SESSION: 'create_session',
   GET_SESSION: 'get_session',
   GET_ALL_SESSIONS: 'get_all_sessions',
   DELETE_SESSION: 'delete_session',
-  UPDATE_SESSION: 'update_session',
 
   // State commands
   GET_RECORDING_STATE: 'get_recording_state',
