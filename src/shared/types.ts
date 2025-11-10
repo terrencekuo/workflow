@@ -72,6 +72,12 @@ export interface RecordedStep {
   metadata?: StepMetadata;
 }
 
+/**
+ * Step data before it's assigned an ID and session ID
+ * Used when creating new steps in event handlers
+ */
+export type StepData = Omit<RecordedStep, 'id' | 'sessionId'>;
+
 export interface SessionMetadata {
   title: string;
   description?: string;

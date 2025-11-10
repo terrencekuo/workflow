@@ -1,9 +1,16 @@
-import { COMMANDS, EVENT_TYPES } from '@/shared/constants';
-import type { RecordedStep } from '@/shared/types';
+import { COMMANDS } from '@/shared/constants';
+import type { RecordedStep, StepData } from '@/shared/types';
 import { DOMAnalyzer } from '@/content/DOMAnalyzer';
+import {
+  handleClick,
+  handleChange,
+  handleSubmit,
+  handleNavigation,
+  type EventHandlerContext,
+} from '@/content/eventHandlers';
 
 /**
- * Recorder class - Captures user interactions and DOM events
+ * Recorder class - Manages recording lifecycle and event listener registration
  */
 export class Recorder {
   private isRecording = false;
@@ -54,17 +61,19 @@ export class Recorder {
    * Setup all event listeners for capturing interactions
    */
   private setupEventListeners(): void {
+    const context = this.getHandlerContext();
+
     // Click events
-    this.addListener(document, 'click', this.handleClick.bind(this), true);
+    this.addListener(document, 'click', (e) => handleClick(e, context), true);
 
     // Change events (select, checkbox, radio)
-    this.addListener(document, 'change', this.handleChange.bind(this), true);
+    this.addListener(document, 'change', (e) => handleChange(e, context), true);
 
     // Form submission
-    this.addListener(document, 'submit', this.handleSubmit.bind(this), true);
+    this.addListener(document, 'submit', (e) => handleSubmit(e, context), true);
 
     // Navigation
-    this.addListener(window, 'popstate', this.handleNavigation.bind(this));
+    this.addListener(window, 'popstate', () => handleNavigation(context));
 
     console.log('[Recorder] Event listeners setup complete');
   }
@@ -95,124 +104,19 @@ export class Recorder {
   }
 
   /**
-   * Handle click events
+   * Get handler context for event handlers
    */
-  private handleClick(event: Event): void {
-    const mouseEvent = event as MouseEvent;
-    const target = mouseEvent.target as HTMLElement;
-
-    if (!this.shouldCaptureElement(target)) {
-      return;
-    }
-
-    const { selector, alternativeSelectors, elementContext } =
-      this.generateSelectorAndContext(target);
-
-    // Record the step (screenshot will be captured by background after delay)
-    this.recordStep({
-      type: EVENT_TYPES.CLICK,
-      selector,
-      alternativeSelectors,
-      elementContext,
-      value: null,
-      url: window.location.href,
-      timestamp: Date.now(),
-      metadata: {
-        text: this.getElementText(target),
-        href: target instanceof HTMLAnchorElement ? target.href : undefined,
-        coordinates: {
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-          pageX: mouseEvent.pageX,
-          pageY: mouseEvent.pageY,
-        },
-      },
-    });
-  }
-
-  /**
-   * Handle change events (select, checkbox, radio)
-   */
-  private handleChange(event: Event): void {
-    const target = event.target as HTMLInputElement | HTMLSelectElement;
-
-    if (!this.shouldCaptureElement(target)) {
-      return;
-    }
-
-    let value: string | boolean = '';
-    let metadata: Record<string, any> = {
-      tagName: target.tagName.toLowerCase(),
+  private getHandlerContext(): EventHandlerContext {
+    return {
+      domAnalyzer: this.domAnalyzer,
+      recordStep: this.recordStep.bind(this),
     };
-
-    if (target instanceof HTMLInputElement) {
-      if (target.type === 'checkbox') {
-        value = target.checked;
-        metadata.inputType = 'checkbox';
-      } else if (target.type === 'radio') {
-        value = target.value;
-        metadata.inputType = 'radio';
-      } else {
-        // Skip other input types (text, etc.) - not captured
-        return;
-      }
-    } else if (target instanceof HTMLSelectElement) {
-      value = target.value;
-      metadata.selectedIndex = target.selectedIndex;
-    }
-
-    this.recordStep({
-      type: EVENT_TYPES.CHANGE,
-      selector: this.generateSelector(target),
-      value,
-      timestamp: Date.now(),
-      metadata,
-    });
-  }
-
-  /**
-   * Handle form submission
-   */
-  private handleSubmit(event: Event): void {
-    const target = event.target as HTMLFormElement;
-
-    // Record the step (screenshot will be captured by background after delay)
-    this.recordStep({
-      type: EVENT_TYPES.SUBMIT,
-      selector: this.generateSelector(target),
-      value: null,
-      timestamp: Date.now(),
-      metadata: {
-        tagName: 'form',
-        action: target.action,
-        method: target.method,
-      },
-    });
-  }
-
-  /**
-   * Handle navigation events
-   */
-  private handleNavigation(): void {
-    this.recordStep({
-      type: EVENT_TYPES.NAVIGATION,
-      selector: 'window',
-      value: window.location.href,
-      timestamp: Date.now(),
-      metadata: {
-        url: window.location.href,
-        pathname: window.location.pathname,
-        search: window.location.search,
-        hash: window.location.hash,
-      },
-    });
   }
 
   /**
    * Record a step and send to background
-   * Background will capture screenshot after appropriate delay
    */
-  private recordStep(stepData: Omit<RecordedStep, 'id' | 'sessionId'>): void {
+  private recordStep(stepData: StepData): void {
     if (!this.isRecording || !this.sessionId) {
       return;
     }
@@ -232,57 +136,6 @@ export class Recorder {
       .catch((error) => {
         console.error('[Recorder] Failed to send step:', error);
       });
-  }
-
-  /**
-   * Generate robust selector and element context using DOMAnalyzer
-   */
-  private generateSelectorAndContext(element: Element): {
-    selector: string;
-    alternativeSelectors: string[];
-    elementContext: any;
-  } {
-    const strategy = this.domAnalyzer.generateSelectorStrategy(element);
-    const context = this.domAnalyzer.extractElementContext(element);
-
-    return {
-      selector: strategy.primary,
-      alternativeSelectors: strategy.fallbacks,
-      elementContext: context,
-    };
-  }
-
-  /**
-   * Fallback: Generate a simple selector (for backwards compatibility)
-   */
-  private generateSelector(element: Element): string {
-    const strategy = this.domAnalyzer.generateSelectorStrategy(element);
-    return strategy.primary;
-  }
-
-  /**
-   * Get visible text content from an element
-   */
-  private getElementText(element: HTMLElement): string {
-    const text = element.textContent?.trim() || '';
-    return text.length > 50 ? text.substring(0, 47) + '...' : text;
-  }
-
-  /**
-   * Check if element should be captured
-   */
-  private shouldCaptureElement(element: Element): boolean {
-    // Skip if element is not in the document
-    if (!document.contains(element)) {
-      return false;
-    }
-
-    // Skip script and style tags
-    if (element instanceof HTMLScriptElement || element instanceof HTMLStyleElement) {
-      return false;
-    }
-
-    return true;
   }
 
 }
