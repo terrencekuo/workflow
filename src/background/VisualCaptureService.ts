@@ -10,15 +10,16 @@ export class VisualCaptureService {
    * Capture screenshot of active tab
    * Handles zoom levels to ensure full viewport is captured
    */
-  async captureTabScreenshot(tabId: number): Promise<string | null> {
+  async captureTabScreenshot(tabId: number, immediate: boolean = false): Promise<string | null> {
     let originalZoom: number | null = null;
 
     try {
       // Get tab info to check if screenshot is possible
       const tab = await chrome.tabs.get(tabId);
-
-      // Check if tab is in a capturable state
-      if (!tab.active) {
+      
+      // For immediate captures (navigation events), skip tab activation check
+      // to capture as fast as possible before page unloads
+      if (!immediate && !tab.active) {
         console.warn('[VisualCapture] Tab is not active, switching to it first');
         await chrome.tabs.update(tabId, { active: true });
         await this.sleep(100); // Brief wait for tab switch
@@ -27,23 +28,26 @@ export class VisualCaptureService {
       // Get current zoom level
       originalZoom = await chrome.tabs.getZoom(tabId);
 
-      console.log('[VisualCapture] Current zoom level:', originalZoom);
+      // For immediate captures, skip zoom normalization to be faster
+      if (!immediate) {
+        console.log('[VisualCapture] Current zoom level:', originalZoom);
 
-      // If zoom is not 100%, temporarily reset it
-      if (originalZoom !== 1.0) {
-        console.log('[VisualCapture] Resetting zoom to 100% for capture');
-        await chrome.tabs.setZoom(tabId, 1.0);
+        // If zoom is not 100%, temporarily reset it
+        if (originalZoom !== 1.0) {
+          console.log('[VisualCapture] Resetting zoom to 100% for capture');
+          await chrome.tabs.setZoom(tabId, 1.0);
 
-        // Wait a moment for the page to reflow at new zoom level
-        await this.sleep(TIMING.ZOOM_REFLOW_WAIT);
+          // Wait a moment for the page to reflow at new zoom level
+          await this.sleep(TIMING.ZOOM_REFLOW_WAIT);
+        }
       }
 
-      // Capture visible tab area at 100% zoom
+      // Capture visible tab area
       const dataUrl = await chrome.tabs.captureVisibleTab({
         format: 'png',
       });
 
-      console.log('[VisualCapture] Screenshot captured successfully');
+      console.log(`[VisualCapture] Screenshot captured ${immediate ? 'immediately' : 'successfully'}`);
       return dataUrl;
     } catch (error) {
       // Provide more specific error messages
@@ -60,8 +64,8 @@ export class VisualCaptureService {
       }
       return null;
     } finally {
-      // Always restore original zoom level
-      if (originalZoom !== null && originalZoom !== 1.0) {
+      // For non-immediate captures, restore original zoom level
+      if (!immediate && originalZoom !== null && originalZoom !== 1.0) {
         try {
           await chrome.tabs.setZoom(tabId, originalZoom);
           console.log('[VisualCapture] Restored original zoom level:', originalZoom);

@@ -80,7 +80,7 @@ export class RecorderController {
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
         console.log('[RecorderController] Tab updated:', tabId, 'URL:', tab.url);
-        
+
         // Check if this is a valid URL for extension interaction
         if (!this.isValidUrl(tab.url)) {
           console.warn('[RecorderController] Skipping restricted URL:', tab.url);
@@ -203,7 +203,7 @@ export class RecorderController {
 
   /**
    * Handle record step command from content script
-   * Captures ONE screenshot after the event with smart detection
+   * Captures screenshot based on event type - immediate for navigation, smart detection for others
    */
   private async handleRecordStep(
     step: RecordedStep
@@ -216,35 +216,63 @@ export class RecorderController {
       // Ensure step has session ID
       step.sessionId = this.currentSessionId;
 
-      // Capture screenshot for major events AFTER the event with smart detection
+      // Capture screenshot for major events
       if (this.shouldCaptureVisual(step.type) && this.currentTabId) {
         try {
-          // Use smart detection to wait for page readiness
-          const readinessState = await this.waitForPageReadiness(this.currentTabId);
+          // Determine if this is a navigation event (link click, form submit)
+          const isNavigationEvent = this.isNavigationEvent(step);
 
-          console.log(
-            `[RecorderController] Page ready for screenshot: ${readinessState.reason} (${readinessState.duration}ms)`,
-            readinessState.checks
-          );
+          if (isNavigationEvent) {
+            // For navigation events, capture IMMEDIATELY before page unloads
+            console.log('[RecorderController] Navigation event detected, capturing immediately');
+            
+            const screenshot = await this.visualCaptureService.captureTabScreenshot(
+              this.currentTabId,
+              true // immediate mode - skip checks for speed
+            );
 
-          // Capture ONE screenshot
-          const screenshot = await this.visualCaptureService.captureTabScreenshot(
-            this.currentTabId
-          );
+            if (screenshot) {
+              step.visual = {
+                viewport: screenshot,
+                thumbnail: screenshot,
+              };
 
-          if (screenshot) {
-            step.visual = {
-              viewport: screenshot,
-              thumbnail: screenshot, // No thumbnail generation for now
-            };
+              if (!step.metadata) {
+                step.metadata = {};
+              }
+              step.metadata.captureType = 'immediate';
+              step.metadata.note = 'Captured before navigation';
 
-            // Store readiness info in metadata for debugging
-            if (!step.metadata) {
-              step.metadata = {};
+              console.log('[RecorderController] Immediate screenshot captured for navigation');
             }
-            step.metadata.pageReadiness = readinessState;
+          } else {
+            // For non-navigation events, use smart detection to wait for page readiness
+            const readinessState = await this.waitForPageReadiness(this.currentTabId);
 
-            console.log('[RecorderController] Captured screenshot for step:', step.type);
+            console.log(
+              `[RecorderController] Page ready for screenshot: ${readinessState.reason} (${readinessState.duration}ms)`,
+              readinessState.checks
+            );
+
+            const screenshot = await this.visualCaptureService.captureTabScreenshot(
+              this.currentTabId,
+              false // normal mode with zoom normalization
+            );
+
+            if (screenshot) {
+              step.visual = {
+                viewport: screenshot,
+                thumbnail: screenshot,
+              };
+
+              if (!step.metadata) {
+                step.metadata = {};
+              }
+              step.metadata.pageReadiness = readinessState;
+              step.metadata.captureType = 'smart';
+
+              console.log('[RecorderController] Smart screenshot captured for step:', step.type);
+            }
           }
         } catch (error) {
           // Don't fail the step if screenshot fails
@@ -268,6 +296,30 @@ export class RecorderController {
         error: error instanceof Error ? error.message : 'Failed to record step',
       };
     }
+  }
+
+  /**
+   * Determine if a step represents a navigation event (link click, form submit)
+   */
+  private isNavigationEvent(step: RecordedStep): boolean {
+    // Form submissions always navigate
+    if (step.type === EVENT_TYPES.SUBMIT) {
+      return true;
+    }
+
+    // Check if it's a click on a link
+    if (step.type === EVENT_TYPES.CLICK) {
+      // Check metadata for href (link click)
+      if (step.metadata?.href) {
+        const href = step.metadata.href as string;
+        // Exclude javascript: and # links (they don't navigate)
+        if (!href.startsWith('javascript:') && !href.startsWith('#')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -483,7 +535,7 @@ export class RecorderController {
     try {
       // Get tab info to check URL
       const tab = await chrome.tabs.get(tabId);
-      
+
       if (!this.isValidUrl(tab.url)) {
         console.warn('[RecorderController] Cannot inject content script into restricted URL:', tab.url);
         return;

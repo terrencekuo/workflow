@@ -95,16 +95,16 @@ export class MessageBroker {
         // Wrap in a race with timeout to prevent hanging
         const response = await Promise.race([
           chrome.tabs.sendMessage(tabId, message),
-          new Promise<MessageResponse>((_, reject) => 
+          new Promise<MessageResponse>((_, reject) =>
             setTimeout(() => reject(new Error('Message timeout')), timeout)
           )
         ]);
         return response;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-        
+
         // Don't log expected errors during page lifecycle
-        if (errorMessage.includes('Receiving end does not exist') || 
+        if (errorMessage.includes('Receiving end does not exist') ||
             errorMessage.includes('Could not establish connection') ||
             errorMessage.includes('message channel closed') ||
             errorMessage.includes('Message timeout')) {
@@ -114,7 +114,7 @@ export class MessageBroker {
             error: errorMessage,
           };
         }
-        
+
         // Log unexpected errors
         console.error('[MessageBroker] Unexpected error sending message to tab:', error);
         return {
