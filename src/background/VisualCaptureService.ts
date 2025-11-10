@@ -16,7 +16,7 @@ export class VisualCaptureService {
     try {
       // Get tab info to check if screenshot is possible
       const tab = await chrome.tabs.get(tabId);
-      
+
       // For immediate captures (navigation events), skip tab activation check
       // to capture as fast as possible before page unloads
       if (!immediate && !tab.active) {

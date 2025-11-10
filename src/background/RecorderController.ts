@@ -78,8 +78,13 @@ export class RecorderController {
 
     // Track when tabs are updated (URL changes)
     chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+      // Log all status changes for debugging
+      if (this.isRecording && tabId === this.currentTabId) {
+        console.log('[RecorderController] Tab status change:', changeInfo.status, 'URL:', tab.url);
+      }
+
       if (this.isRecording && tabId === this.currentTabId && changeInfo.status === 'complete') {
-        console.log('[RecorderController] Tab updated:', tabId, 'URL:', tab.url);
+        console.log('[RecorderController] ✅ Tab navigation complete:', tabId, 'URL:', tab.url);
 
         // Check if this is a valid URL for extension interaction
         if (!this.isValidUrl(tab.url)) {
@@ -89,12 +94,16 @@ export class RecorderController {
 
         // Give the page a moment to settle after 'complete' status
         // This helps ensure DOM is ready before we inject content script
+        console.log('[RecorderController] Waiting 300ms for page to settle...');
         await new Promise((resolve) => setTimeout(resolve, 300));
 
+        console.log('[RecorderController] Ensuring content script is loaded...');
         await this.ensureContentScriptLoaded(tabId);
 
         // Capture the final loaded state after navigation
+        console.log('[RecorderController] Calling capturePageLoadStep...');
         await this.capturePageLoadStep(tabId, tab.url || '');
+        console.log('[RecorderController] ✅ Page load handling complete');
       }
     });
 
@@ -225,7 +234,7 @@ export class RecorderController {
           if (isNavigationEvent) {
             // For navigation events, capture IMMEDIATELY before page unloads
             console.log('[RecorderController] Navigation event detected, capturing immediately');
-            
+
             const screenshot = await this.visualCaptureService.captureTabScreenshot(
               this.currentTabId,
               true // immediate mode - skip checks for speed
@@ -675,29 +684,46 @@ export class RecorderController {
    * This ensures we get the final state of the loaded page
    */
   private async capturePageLoadStep(tabId: number, url: string): Promise<void> {
+    console.log('[RecorderController] 🔵 capturePageLoadStep START - TabId:', tabId, 'URL:', url);
+    console.log('[RecorderController] Recording state:', {
+      isRecording: this.isRecording,
+      sessionId: this.currentSessionId,
+      currentTabId: this.currentTabId,
+      stepCount: this.stepCount
+    });
+
     if (!this.isRecording || !this.currentSessionId) {
+      console.warn('[RecorderController] ⚠️ Not recording or no session ID, skipping page load capture');
       return;
     }
 
     try {
-      console.log('[RecorderController] Capturing page load for:', url);
+      console.log('[RecorderController] 📸 Capturing page load for:', url);
 
       // Check if URL is valid for screenshot capture
       if (!this.isValidUrl(url)) {
-        console.warn('[RecorderController] Skipping page load capture for restricted URL:', url);
+        console.warn('[RecorderController] ⚠️ Skipping page load capture for restricted URL:', url);
         return;
       }
 
+      console.log('[RecorderController] ⏳ Waiting for page readiness...');
       // Wait for page to be ready with smart detection
       const readinessState = await this.waitForPageReadiness(tabId);
 
       console.log(
-        `[RecorderController] Page load ready: ${readinessState.reason} (${readinessState.duration}ms)`,
+        `[RecorderController] ✅ Page load ready: ${readinessState.reason} (${readinessState.duration}ms)`,
         readinessState.checks
       );
 
+      console.log('[RecorderController] 📷 Capturing screenshot...');
       // Capture screenshot of the loaded page
       const screenshot = await this.visualCaptureService.captureTabScreenshot(tabId);
+
+      if (screenshot) {
+        console.log('[RecorderController] ✅ Screenshot captured, length:', screenshot.length);
+      } else {
+        console.warn('[RecorderController] ⚠️ No screenshot returned');
+      }
 
       // Create page load step
       const step: RecordedStep = {
@@ -721,18 +747,19 @@ export class RecorderController {
           thumbnail: screenshot,
         };
       } else {
-        console.warn('[RecorderController] Page load captured without screenshot');
+        console.warn('[RecorderController] ⚠️ Page load captured without screenshot');
       }
 
+      console.log('[RecorderController] 💾 Saving step to database...');
       // Save to database
       await db.addStep(this.currentSessionId, step);
       this.stepCount++;
       await this.saveState();
 
-      console.log('[RecorderController] Page load step recorded:', url);
+      console.log('[RecorderController] ✅ Page load step recorded successfully:', url, 'Step count:', this.stepCount);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('[RecorderController] Error capturing page load step:', errorMessage, error);
+      console.error('[RecorderController] ❌ Error capturing page load step:', errorMessage, error);
       // Don't throw - page load capture is non-critical
     }
   }
