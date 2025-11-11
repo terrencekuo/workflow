@@ -93,6 +93,7 @@ export interface Session {
   createdAt: number;
   updatedAt: number;
   stepCount?: number; // Optional: used when returning lightweight session lists
+  thumbnail?: string; // Optional: thumbnail from first step for session previews
 }
 
 export interface MessagePayload {

@@ -175,11 +175,17 @@ export class DB {
 
         // Return sessions with steps array replaced by just the count
         // This avoids sending massive screenshot data over chrome.runtime.sendMessage
-        const lightSessions = sessions.map(session => ({
-          ...session,
-          steps: [], // Remove step details to avoid message size limits
-          stepCount: session.steps.length, // Add step count for display
-        }));
+        const lightSessions = sessions.map(session => {
+          // Extract thumbnail from first step if available
+          const firstStepThumbnail = session.steps[0]?.visual?.thumbnail || session.steps[0]?.visual?.viewport;
+
+          return {
+            ...session,
+            steps: [], // Remove step details to avoid message size limits
+            stepCount: session.steps.length, // Add step count for display
+            thumbnail: firstStepThumbnail, // Add first step thumbnail for preview
+          };
+        });
 
         resolve(lightSessions as Session[]);
       };

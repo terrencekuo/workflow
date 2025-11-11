@@ -17,17 +17,14 @@ export default function SessionListItem({ session, onView, onDelete }: SessionLi
     });
   };
 
-  // Get thumbnail from first step if available
-  const thumbnail = session.steps[0]?.visual?.thumbnail || session.steps[0]?.visual?.viewport;
-
   return (
     <div className="group bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all duration-200">
       <div className="flex items-center gap-4">
-        {/* Thumbnail */}
-        <div className="flex-shrink-0 w-32 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
-          {thumbnail ? (
+        {/* Thumbnail - maintains 16:9 aspect ratio (YouTube-style) */}
+        <div className="flex-shrink-0 w-40 aspect-video bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
+          {session.thumbnail ? (
             <img
-              src={thumbnail}
+              src={session.thumbnail}
               alt={session.metadata.title}
               className="w-full h-full object-cover"
             />

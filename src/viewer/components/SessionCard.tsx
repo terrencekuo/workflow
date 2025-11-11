@@ -15,16 +15,13 @@ export default function SessionCard({ session, onView, onDelete }: SessionCardPr
     });
   };
 
-  // Get thumbnail from first step if available
-  const thumbnail = session.steps[0]?.visual?.thumbnail || session.steps[0]?.visual?.viewport;
-
   return (
     <div className="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-1">
-      {/* Thumbnail */}
+      {/* Thumbnail - YouTube-style 16:9 aspect ratio */}
       <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-        {thumbnail ? (
+        {session.thumbnail ? (
           <img
-            src={thumbnail}
+            src={session.thumbnail}
             alt={session.metadata.title}
             className="w-full h-full object-cover"
           />
