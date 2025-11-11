@@ -24,12 +24,12 @@ export default function ScreenshotViewer({ visual, stepNumber }: ScreenshotViewe
   }
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-      <div className="p-6">
+    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 h-full flex items-center justify-center">
+      <div className="p-6 max-h-full max-w-full flex items-center justify-center overflow-auto">
         <img
           src={screenshot}
           alt={`Step ${stepNumber} screenshot`}
-          className="w-full rounded-lg"
+          className="max-w-full max-h-full object-contain rounded-lg"
           style={{
             imageRendering: 'crisp-edges',
             boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'

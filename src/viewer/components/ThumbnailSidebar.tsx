@@ -13,18 +13,10 @@ export default function ThumbnailSidebar({
 }: ThumbnailSidebarProps) {
   return (
     <div className="w-56 flex-shrink-0">
-      <div className="sticky top-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-3 px-4 py-3">
-          <h3 className="text-sm font-semibold text-gray-900">
-            Steps ({steps.length})
-          </h3>
-          <p className="text-xs text-gray-500 mt-1">Click to jump</p>
-        </div>
-
+      <div className="h-full">
         {/* Scrollable Thumbnails */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full">
+          <div className="h-full overflow-y-auto custom-scrollbar">
             <div className="p-2 space-y-2">
               {steps.map((step, index) => {
                 const screenshot = step.visual?.thumbnail || step.visual?.viewport;

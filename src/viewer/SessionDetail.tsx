@@ -129,12 +129,12 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[1800px] mx-auto px-6 py-8">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      <div className="max-w-[1800px] mx-auto w-full px-6 py-4 flex flex-col h-full">
         {/* Back Button */}
         <button
           onClick={onBack}
-          className="mb-6 px-4 py-2 text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2 hover:gap-3 transition-all duration-200"
+          className="mb-4 px-4 py-2 text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2 hover:gap-3 transition-all duration-200"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -142,43 +142,8 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
           <span>Back to Sessions</span>
         </button>
 
-        {/* Section 1: Session Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3 tracking-tight">
-            {session.metadata.title}
-          </h1>
-          {session.metadata.description && (
-            <p className="text-gray-600 text-base mb-4 leading-relaxed">
-              {session.metadata.description}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900">{session.steps.length}</span>
-              <span>steps</span>
-            </div>
-            <span className="text-gray-300">•</span>
-            <span>{formatDate(session.createdAt)}</span>
-            {session.metadata.tags && session.metadata.tags.length > 0 && (
-              <>
-                <span className="text-gray-300">•</span>
-                <div className="flex gap-2">
-                  {session.metadata.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 bg-gray-100 text-gray-700 text-xs rounded-full font-medium"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Section 2: Main Content Area - 3 Column Layout */}
-        <div className="flex gap-6">
+        {/* Main Content Area - 3 Column Layout */}
+        <div className="flex gap-6 flex-1 min-h-0">
           {/* Left Column: Thumbnail Sidebar */}
           <ThumbnailSidebar
             steps={session.steps}
@@ -186,33 +151,65 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
             onStepClick={handleStepClick}
           />
 
-          {/* Center Column: Screenshot Viewer + Navigation */}
-          <div className="flex-1 space-y-4">
-            {/* Screenshot Viewer */}
-            <ScreenshotViewer
-              visual={currentStep.visual}
-              stepNumber={currentStepIndex + 1}
-            />
+          {/* Center Column: Session Info + Screenshot Viewer + Navigation */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Session Header - Compact */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-4 mb-4 flex-shrink-0">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">
+                {session.metadata.title}
+              </h1>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">{session.steps.length}</span>
+                  <span>steps</span>
+                </div>
+                <span className="text-gray-300">•</span>
+                <span>{formatDate(session.createdAt)}</span>
+                {session.metadata.tags && session.metadata.tags.length > 0 && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <div className="flex gap-2">
+                      {session.metadata.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full font-medium"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
 
-            {/* Navigation Controls */}
-            <NavigationControls
-              currentStep={currentStepIndex + 1}
-              totalSteps={session.steps.length}
-              onPrevious={handlePrevious}
-              onNext={handleNext}
-              canGoPrevious={canGoPrevious}
-              canGoNext={canGoNext}
-            />
-          </div>
-
-          {/* Right Column: Step Details Panel */}
-          <div className="w-80 flex-shrink-0">
-            <div className="sticky top-6">
-              <StepDetailsPanel
-                step={currentStep}
+            {/* Screenshot Viewer - Flexible height */}
+            <div className="flex-1 min-h-0 mb-4">
+              <ScreenshotViewer
+                visual={currentStep.visual}
                 stepNumber={currentStepIndex + 1}
               />
             </div>
+
+            {/* Navigation Controls - Fixed at bottom */}
+            <div className="flex-shrink-0">
+              <NavigationControls
+                currentStep={currentStepIndex + 1}
+                totalSteps={session.steps.length}
+                onPrevious={handlePrevious}
+                onNext={handleNext}
+                canGoPrevious={canGoPrevious}
+                canGoNext={canGoNext}
+              />
+            </div>
+          </div>
+
+          {/* Right Column: Step Details Panel */}
+          <div className="w-80 flex-shrink-0 overflow-y-auto">
+            <StepDetailsPanel
+              step={currentStep}
+              stepNumber={currentStepIndex + 1}
+            />
           </div>
         </div>
       </div>
