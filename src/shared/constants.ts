@@ -20,6 +20,9 @@ export const COMMANDS = {
   // Session commands
   GET_SESSION: 'get_session',
   GET_ALL_SESSIONS: 'get_all_sessions',
+  GET_SESSION_COUNT: 'get_session_count',
+  GET_SESSION_IDS: 'get_session_ids',
+  GET_SESSIONS_BATCH: 'get_sessions_batch',
   DELETE_SESSION: 'delete_session',
 
   // State commands
@@ -90,8 +93,4 @@ export const CONFIG = {
   SCREENSHOT_QUALITY: 0.8,
   THUMBNAIL_WIDTH: 200,
   THUMBNAIL_HEIGHT: 150,
-  // Chrome message size limits
-  MAX_MESSAGE_SIZE: 64 * 1024 * 1024, // 64MB hard limit
-  SAFE_MESSAGE_SIZE: 50 * 1024 * 1024, // 50MB safe limit (leave headroom)
-  WARNING_MESSAGE_SIZE: 40 * 1024 * 1024, // 40MB warning threshold
 } as const;

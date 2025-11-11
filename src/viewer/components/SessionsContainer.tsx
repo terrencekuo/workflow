@@ -55,20 +55,55 @@ export default function SessionsContainer({ onSessionSelect }: SessionsContainer
   const loadSessions = async () => {
     setLoading(true);
     setError(null);
+    setSessions([]); // Clear existing sessions
 
-    console.log('[SessionsContainer] Loading sessions...');
-    const response = await sendMessage(COMMANDS.GET_ALL_SESSIONS);
-    console.log('[SessionsContainer] Response:', response);
+    try {
+      console.log('[SessionsContainer] Starting chunked session loading...');
 
-    if (response.success && response.data) {
-      console.log('[SessionsContainer] Loaded', response.data.length, 'sessions');
-      setSessions(response.data);
-    } else {
-      console.error('[SessionsContainer] Error loading sessions:', response.error);
-      setError(response.error || 'Failed to load sessions');
+      // Step 1: Get all session IDs (sorted by updatedAt descending)
+      const idsResponse = await sendMessage(COMMANDS.GET_SESSION_IDS);
+
+      if (!idsResponse.success || !idsResponse.data) {
+        throw new Error(idsResponse.error || 'Failed to get session IDs');
+      }
+
+      const sessionIds: string[] = idsResponse.data;
+      console.log(`[SessionsContainer] Found ${sessionIds.length} sessions`);
+
+      if (sessionIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Load sessions in chunks of 2
+      const CHUNK_SIZE = 2;
+      const loadedSessions: Session[] = [];
+
+      for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
+        const chunkIds = sessionIds.slice(i, i + CHUNK_SIZE);
+        console.log(`[SessionsContainer] Loading chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(sessionIds.length / CHUNK_SIZE)}`);
+
+        const batchResponse = await sendMessage(COMMANDS.GET_SESSIONS_BATCH, { sessionIds: chunkIds });
+
+        if (batchResponse.success && batchResponse.data) {
+          const batchSessions: Session[] = batchResponse.data;
+          loadedSessions.push(...batchSessions);
+
+          // Update UI progressively as we load each chunk
+          setSessions([...loadedSessions]);
+        } else {
+          console.error('[SessionsContainer] Error loading batch:', batchResponse.error);
+          // Continue loading other chunks even if one fails
+        }
+      }
+
+      console.log(`[SessionsContainer] Finished loading ${loadedSessions.length} sessions`);
+    } catch (error) {
+      console.error('[SessionsContainer] Error loading sessions:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load sessions');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleDelete = async (sessionId: string) => {
@@ -146,28 +181,8 @@ export default function SessionsContainer({ onSessionSelect }: SessionsContainer
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-500 rounded-xl overflow-hidden">
-            <div className="p-4">
-              <div className="flex items-start gap-3">
-                <svg className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div className="flex-1">
-                  <h3 className="text-red-900 font-semibold mb-1">Error Loading Sessions</h3>
-                  <p className="text-red-700 text-sm">{error}</p>
-                  {error.includes('Payload too large') && (
-                    <div className="mt-3 p-3 bg-red-100 rounded-lg text-sm text-red-800">
-                      <p className="font-medium mb-2">Suggestions to fix this:</p>
-                      <ul className="list-disc list-inside space-y-1 text-xs">
-                        <li>Delete some older sessions to reduce data size</li>
-                        <li>The extension will work normally after removing a few sessions</li>
-                        <li>Consider exporting sessions before deleting if you need to keep them</li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
+            {error}
           </div>
         )}
 

@@ -1,27 +1,6 @@
 // IndexedDB wrapper for storing sessions and steps
-import { DB_NAME, DB_VERSION, STORE_SESSIONS, STORE_STEPS, CONFIG } from '@/shared/constants';
+import { DB_NAME, DB_VERSION, STORE_SESSIONS, STORE_STEPS } from '@/shared/constants';
 import type { Session, RecordedStep, SessionMetadata } from '@/shared/types';
-
-/**
- * Estimate the size of a JavaScript object in bytes
- * This is an approximation for detecting oversized payloads
- */
-function estimateObjectSize(obj: any): number {
-  const jsonString = JSON.stringify(obj);
-  // Each character is roughly 2 bytes in UTF-16 (JavaScript's internal encoding)
-  return jsonString.length * 2;
-}
-
-/**
- * Format bytes to human-readable string
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-}
 
 export class DB {
   private db: IDBDatabase | null = null;
@@ -178,13 +157,118 @@ export class DB {
   }
 
   /**
+   * Get the total count of sessions
+   */
+  async getSessionCount(): Promise<number> {
+    const db = await this.ensureInit();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_SESSIONS], 'readonly');
+      const store = transaction.objectStore(STORE_SESSIONS);
+      const request = store.count();
+
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+
+      request.onerror = () => {
+        reject(new Error(`Failed to count sessions: ${request.error?.message}`));
+      };
+    });
+  }
+
+  /**
+   * Get session IDs sorted by updatedAt (for chunked loading)
+   */
+  async getSessionIds(): Promise<string[]> {
+    const db = await this.ensureInit();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_SESSIONS], 'readonly');
+      const store = transaction.objectStore(STORE_SESSIONS);
+      const index = store.index('updatedAt');
+      const request = index.openCursor(null, 'prev'); // 'prev' for descending order
+
+      const ids: string[] = [];
+
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest).result;
+        if (cursor) {
+          ids.push(cursor.primaryKey as string);
+          cursor.continue();
+        } else {
+          resolve(ids);
+        }
+      };
+
+      request.onerror = () => {
+        reject(new Error(`Failed to get session IDs: ${request.error?.message}`));
+      };
+    });
+  }
+
+  /**
+   * Get a batch of sessions by IDs (lightweight, without step details)
+   * This is optimized for chunked loading to avoid message size limits
+   */
+  async getSessionsBatch(sessionIds: string[]): Promise<Session[]> {
+    const db = await this.ensureInit();
+
+    return new Promise((resolve) => {
+      const transaction = db.transaction([STORE_SESSIONS], 'readonly');
+      const store = transaction.objectStore(STORE_SESSIONS);
+      const sessions: Session[] = [];
+      let completed = 0;
+
+      if (sessionIds.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      sessionIds.forEach((id) => {
+        const request = store.get(id);
+
+        request.onsuccess = () => {
+          const session = request.result as Session | undefined;
+          if (session) {
+            // Extract thumbnail from first step if available
+            const firstStepThumbnail = session.steps[0]?.visual?.thumbnail || session.steps[0]?.visual?.viewport;
+
+            // Create lightweight session
+            const lightSession: Session = {
+              ...session,
+              steps: [], // Remove step details to avoid message size limits
+              stepCount: session.steps.length,
+              thumbnail: firstStepThumbnail,
+            };
+
+            sessions.push(lightSession);
+          }
+
+          completed++;
+          if (completed === sessionIds.length) {
+            console.log(`[DB] Loaded batch of ${sessions.length} sessions`);
+            resolve(sessions);
+          }
+        };
+
+        request.onerror = () => {
+          completed++;
+          console.error(`[DB] Failed to load session ${id}:`, request.error);
+          if (completed === sessionIds.length) {
+            resolve(sessions); // Return partial results
+          }
+        };
+      });
+    });
+  }
+
+  /**
    * Get all sessions (metadata only, without step details)
-   * This is much lighter for listing sessions
-   *
-   * IMPORTANT: This method strips out step data to avoid Chrome message size limits.
-   * The result is optimized for chrome.runtime.sendMessage which has a ~64MB limit.
+   * DEPRECATED: Use chunked loading with getSessionIds + getSessionsBatch instead
    */
   async getAllSessions(): Promise<Session[]> {
+    console.warn('[DB] getAllSessions is deprecated. Use chunked loading instead.');
     const db = await this.ensureInit();
 
     return new Promise((resolve, reject) => {
@@ -201,7 +285,6 @@ export class DB {
         sessions.sort((a, b) => b.updatedAt - a.updatedAt);
 
         // Return sessions with steps array replaced by just the count
-        // This avoids sending massive screenshot data over chrome.runtime.sendMessage
         const lightSessions = sessions.map(session => {
           // Extract thumbnail from first step if available
           const firstStepThumbnail = session.steps[0]?.visual?.thumbnail || session.steps[0]?.visual?.viewport;
@@ -213,38 +296,6 @@ export class DB {
             thumbnail: firstStepThumbnail, // Add first step thumbnail for preview
           };
         });
-
-        // Estimate payload size to warn about potential issues
-        const estimatedSize = estimateObjectSize(lightSessions);
-        const sizeFormatted = formatBytes(estimatedSize);
-
-        console.log(`[DB] Prepared ${lightSessions.length} lightweight sessions (estimated size: ${sizeFormatted})`);
-
-        // Check if payload is approaching dangerous sizes
-        if (estimatedSize > CONFIG.SAFE_MESSAGE_SIZE) {
-          const maxFormatted = formatBytes(CONFIG.MAX_MESSAGE_SIZE);
-          const safeFormatted = formatBytes(CONFIG.SAFE_MESSAGE_SIZE);
-
-          console.error(
-            `[DB] ⚠️ WARNING: Payload size (${sizeFormatted}) exceeds safe limit (${safeFormatted})!\n` +
-            `Chrome message limit is ${maxFormatted}. This may cause failures.\n` +
-            `Consider implementing pagination or reducing thumbnail sizes.`
-          );
-
-          reject(new Error(
-            `Payload too large: ${sizeFormatted} exceeds safe limit of ${safeFormatted}. ` +
-            `Chrome enforces a ${maxFormatted} limit on messages. ` +
-            `Reduce the number of sessions or thumbnail sizes.`
-          ));
-          return;
-        }
-
-        if (estimatedSize > CONFIG.WARNING_MESSAGE_SIZE) {
-          const warningFormatted = formatBytes(CONFIG.WARNING_MESSAGE_SIZE);
-          console.warn(
-            `[DB] ⚠️ Payload size (${sizeFormatted}) is approaching limits (warning threshold: ${warningFormatted})`
-          );
-        }
 
         resolve(lightSessions as Session[]);
       };

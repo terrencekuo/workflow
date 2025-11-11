@@ -27,7 +27,7 @@ const recorderController = new RecorderController(messageBroker, visualCaptureSe
 // Register session management handlers
 messageBroker.on(COMMANDS.GET_ALL_SESSIONS, async (): Promise<MessageResponse> => {
   try {
-    console.log('[Background] GET_ALL_SESSIONS called');
+    console.log('[Background] GET_ALL_SESSIONS called (deprecated)');
     const sessions = await db.getAllSessions();
     console.log('[Background] Found sessions:', sessions.length);
     return { success: true, data: sessions };
@@ -36,6 +36,51 @@ messageBroker.on(COMMANDS.GET_ALL_SESSIONS, async (): Promise<MessageResponse> =
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get sessions',
+    };
+  }
+});
+
+messageBroker.on(COMMANDS.GET_SESSION_COUNT, async (): Promise<MessageResponse> => {
+  try {
+    console.log('[Background] GET_SESSION_COUNT called');
+    const count = await db.getSessionCount();
+    console.log('[Background] Session count:', count);
+    return { success: true, data: count };
+  } catch (error) {
+    console.error('[Background] Error getting session count:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get session count',
+    };
+  }
+});
+
+messageBroker.on(COMMANDS.GET_SESSION_IDS, async (): Promise<MessageResponse> => {
+  try {
+    console.log('[Background] GET_SESSION_IDS called');
+    const ids = await db.getSessionIds();
+    console.log('[Background] Found session IDs:', ids.length);
+    return { success: true, data: ids };
+  } catch (error) {
+    console.error('[Background] Error getting session IDs:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get session IDs',
+    };
+  }
+});
+
+messageBroker.on(COMMANDS.GET_SESSIONS_BATCH, async (data: { sessionIds: string[] }): Promise<MessageResponse> => {
+  try {
+    console.log('[Background] GET_SESSIONS_BATCH called for', data.sessionIds.length, 'sessions');
+    const sessions = await db.getSessionsBatch(data.sessionIds);
+    console.log('[Background] Loaded batch:', sessions.length, 'sessions');
+    return { success: true, data: sessions };
+  } catch (error) {
+    console.error('[Background] Error getting sessions batch:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get sessions batch',
     };
   }
 });
