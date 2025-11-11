@@ -83,7 +83,13 @@ export class ElementContextExtractor {
       this.getDirectText(element).substring(0, 20),
     ];
 
-    return btoa(parts.join('|')).substring(0, 16);
+    // Use TextEncoder to handle Unicode characters properly
+    const text = parts.join('|');
+    const bytes = new TextEncoder().encode(text);
+
+    // Convert bytes to base64 (safe for all Unicode)
+    const binaryString = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+    return btoa(binaryString).substring(0, 16);
   }
 
   /**
