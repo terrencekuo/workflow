@@ -1,6 +1,27 @@
 // IndexedDB wrapper for storing sessions and steps
-import { DB_NAME, DB_VERSION, STORE_SESSIONS, STORE_STEPS } from '@/shared/constants';
+import { DB_NAME, DB_VERSION, STORE_SESSIONS, STORE_STEPS, CONFIG } from '@/shared/constants';
 import type { Session, RecordedStep, SessionMetadata } from '@/shared/types';
+
+/**
+ * Estimate the size of a JavaScript object in bytes
+ * This is an approximation for detecting oversized payloads
+ */
+function estimateObjectSize(obj: any): number {
+  const jsonString = JSON.stringify(obj);
+  // Each character is roughly 2 bytes in UTF-16 (JavaScript's internal encoding)
+  return jsonString.length * 2;
+}
+
+/**
+ * Format bytes to human-readable string
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
 
 export class DB {
   private db: IDBDatabase | null = null;
@@ -159,6 +180,9 @@ export class DB {
   /**
    * Get all sessions (metadata only, without step details)
    * This is much lighter for listing sessions
+   *
+   * IMPORTANT: This method strips out step data to avoid Chrome message size limits.
+   * The result is optimized for chrome.runtime.sendMessage which has a ~64MB limit.
    */
   async getAllSessions(): Promise<Session[]> {
     const db = await this.ensureInit();
@@ -170,6 +194,9 @@ export class DB {
 
       request.onsuccess = () => {
         const sessions = request.result as Session[];
+
+        console.log(`[DB] Retrieved ${sessions.length} sessions from IndexedDB`);
+
         // Sort by updatedAt descending
         sessions.sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -186,6 +213,38 @@ export class DB {
             thumbnail: firstStepThumbnail, // Add first step thumbnail for preview
           };
         });
+
+        // Estimate payload size to warn about potential issues
+        const estimatedSize = estimateObjectSize(lightSessions);
+        const sizeFormatted = formatBytes(estimatedSize);
+
+        console.log(`[DB] Prepared ${lightSessions.length} lightweight sessions (estimated size: ${sizeFormatted})`);
+
+        // Check if payload is approaching dangerous sizes
+        if (estimatedSize > CONFIG.SAFE_MESSAGE_SIZE) {
+          const maxFormatted = formatBytes(CONFIG.MAX_MESSAGE_SIZE);
+          const safeFormatted = formatBytes(CONFIG.SAFE_MESSAGE_SIZE);
+
+          console.error(
+            `[DB] ⚠️ WARNING: Payload size (${sizeFormatted}) exceeds safe limit (${safeFormatted})!\n` +
+            `Chrome message limit is ${maxFormatted}. This may cause failures.\n` +
+            `Consider implementing pagination or reducing thumbnail sizes.`
+          );
+
+          reject(new Error(
+            `Payload too large: ${sizeFormatted} exceeds safe limit of ${safeFormatted}. ` +
+            `Chrome enforces a ${maxFormatted} limit on messages. ` +
+            `Reduce the number of sessions or thumbnail sizes.`
+          ));
+          return;
+        }
+
+        if (estimatedSize > CONFIG.WARNING_MESSAGE_SIZE) {
+          const warningFormatted = formatBytes(CONFIG.WARNING_MESSAGE_SIZE);
+          console.warn(
+            `[DB] ⚠️ Payload size (${sizeFormatted}) is approaching limits (warning threshold: ${warningFormatted})`
+          );
+        }
 
         resolve(lightSessions as Session[]);
       };

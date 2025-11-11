@@ -146,8 +146,28 @@ export default function SessionsContainer({ onSessionSelect }: SessionsContainer
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
-            {error}
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 rounded-xl overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-red-900 font-semibold mb-1">Error Loading Sessions</h3>
+                  <p className="text-red-700 text-sm">{error}</p>
+                  {error.includes('Payload too large') && (
+                    <div className="mt-3 p-3 bg-red-100 rounded-lg text-sm text-red-800">
+                      <p className="font-medium mb-2">Suggestions to fix this:</p>
+                      <ul className="list-disc list-inside space-y-1 text-xs">
+                        <li>Delete some older sessions to reduce data size</li>
+                        <li>The extension will work normally after removing a few sessions</li>
+                        <li>Consider exporting sessions before deleting if you need to keep them</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

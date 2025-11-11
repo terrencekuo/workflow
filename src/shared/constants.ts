@@ -90,4 +90,8 @@ export const CONFIG = {
   SCREENSHOT_QUALITY: 0.8,
   THUMBNAIL_WIDTH: 200,
   THUMBNAIL_HEIGHT: 150,
+  // Chrome message size limits
+  MAX_MESSAGE_SIZE: 64 * 1024 * 1024, // 64MB hard limit
+  SAFE_MESSAGE_SIZE: 50 * 1024 * 1024, // 50MB safe limit (leave headroom)
+  WARNING_MESSAGE_SIZE: 40 * 1024 * 1024, // 40MB warning threshold
 } as const;
