@@ -3,10 +3,9 @@ import type { VisualCapture } from '@/shared/types';
 interface ScreenshotViewerProps {
   visual: VisualCapture | undefined;
   stepNumber: number;
-  totalSteps: number;
 }
 
-export default function ScreenshotViewer({ visual, stepNumber, totalSteps }: ScreenshotViewerProps) {
+export default function ScreenshotViewer({ visual, stepNumber }: ScreenshotViewerProps) {
   // Get the screenshot (prioritize viewport, then thumbnail)
   const screenshot = visual?.viewport || visual?.thumbnail;
 
@@ -25,27 +24,17 @@ export default function ScreenshotViewer({ visual, stepNumber, totalSteps }: Scr
   }
 
   return (
-    <div className="space-y-3">
-      {/* Step Counter - Minimal and Subtle */}
-      <div className="flex items-center justify-between px-1">
-        <div className="text-sm font-medium text-gray-400">
-          Step {stepNumber} of {totalSteps}
-        </div>
-      </div>
-
-      {/* Screenshot Container - Clean and Minimal */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-        <div className="p-6">
-          <img
-            src={screenshot}
-            alt={`Step ${stepNumber} screenshot`}
-            className="w-full rounded-lg"
-            style={{
-              imageRendering: 'crisp-edges',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
-            }}
-          />
-        </div>
+    <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+      <div className="p-6">
+        <img
+          src={screenshot}
+          alt={`Step ${stepNumber} screenshot`}
+          className="w-full rounded-lg"
+          style={{
+            imageRendering: 'crisp-edges',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
+          }}
+        />
       </div>
     </div>
   );
