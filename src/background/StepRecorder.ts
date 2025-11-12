@@ -26,7 +26,16 @@ export class StepRecorder {
       const sessionId = this.stateManager.getCurrentSessionId();
       const currentTabId = this.stateManager.getCurrentTabId();
 
+      console.log('[StepRecorder] 🔵 recordStep called with:', {
+        stepType: step.type,
+        selector: step.selector,
+        isRecording: this.stateManager.isCurrentlyRecording(),
+        sessionId: sessionId,
+        currentTabId: currentTabId
+      });
+
       if (!this.stateManager.isCurrentlyRecording() || !sessionId) {
+        console.log('[StepRecorder] ⚠️ Not recording or no session');
         return { success: false, error: 'Not currently recording' };
       }
 
@@ -34,7 +43,10 @@ export class StepRecorder {
       step.sessionId = sessionId;
 
       // SIMPLIFIED: Capture screenshot for major events
-      if (this.shouldCaptureVisual(step.type) && currentTabId) {
+      const shouldCapture = this.shouldCaptureVisual(step.type);
+      console.log('[StepRecorder] shouldCaptureVisual(' + step.type + ') =', shouldCapture);
+
+      if (shouldCapture && currentTabId) {
         try {
           console.log('[StepRecorder] 📷 Capturing screenshot for step type:', step.type);
 
@@ -289,6 +301,12 @@ export class StepRecorder {
       EVENT_TYPES.NAVIGATION,
       EVENT_TYPES.PAGE_LOAD,
     ];
-    return visualEvents.includes(stepType as any);
+    const result = visualEvents.includes(stepType as any);
+    console.log('[StepRecorder] shouldCaptureVisual check:', {
+      stepType,
+      visualEvents,
+      result
+    });
+    return result;
   }
 }

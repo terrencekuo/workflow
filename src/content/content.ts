@@ -3,10 +3,13 @@ import { COMMANDS } from '@/shared/constants';
 import type { MessagePayload, MessageResponse } from '@/shared/types';
 import { Recorder } from '@/content/Recorder';
 
-console.log('[Content] Content script loaded');
+console.log('[Content] 🚀 Content script loaded at:', new Date().toISOString());
+console.log('[Content] URL:', window.location.href);
+console.log('[Content] Document ready state:', document.readyState);
 
 // Initialize recorder
 const recorder = new Recorder();
+console.log('[Content] ✅ Recorder initialized');
 
 /**
  * Send message to background script

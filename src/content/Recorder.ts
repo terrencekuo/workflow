@@ -120,7 +120,15 @@ export class Recorder {
    * Record a step and send to background
    */
   private recordStep(stepData: StepData): void {
+    console.log('[Recorder] 📝 recordStep called:', {
+      type: stepData.type,
+      selector: stepData.selector,
+      isRecording: this.isRecording,
+      sessionId: this.sessionId
+    });
+
     if (!this.isRecording || !this.sessionId) {
+      console.log('[Recorder] ⚠️ Not recording or no sessionId');
       return;
     }
 
@@ -130,14 +138,19 @@ export class Recorder {
       sessionId: this.sessionId,
     };
 
+    console.log('[Recorder] 📤 Sending step to background:', step.type);
+
     // Send to background script
     chrome.runtime
       .sendMessage({
         command: COMMANDS.RECORD_STEP,
         data: step,
       })
+      .then((response) => {
+        console.log('[Recorder] ✅ Step sent successfully:', response);
+      })
       .catch((error) => {
-        console.error('[Recorder] Failed to send step:', error);
+        console.error('[Recorder] ❌ Failed to send step:', error);
       });
   }
 

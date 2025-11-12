@@ -42,7 +42,10 @@ export function handleClick(event: Event, context: EventHandlerContext): void {
   const mouseEvent = event as MouseEvent;
   const target = mouseEvent.target as HTMLElement;
 
+  console.log('[EventHandlers] 🖱️ Click event fired on:', target);
+
   if (!shouldCaptureElement(target)) {
+    console.log('[EventHandlers] ⚠️ Element should not be captured');
     return;
   }
 
@@ -70,6 +73,7 @@ export function handleClick(event: Event, context: EventHandlerContext): void {
     metadata,
   };
 
+  console.log('[EventHandlers] ✅ Recording click step:', { type: step.type, selector });
   context.recordStep(step);
 }
 
