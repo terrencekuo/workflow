@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { COMMANDS } from '@/shared/constants';
-import type { Session, MessageResponse } from '@/shared/types';
+import type { Session, RecordedStep, MessageResponse } from '@/shared/types';
 import ScreenshotViewer from './components/ScreenshotViewer';
 import StepDetailsPanel from './components/StepDetailsPanel';
 import NavigationControls from './components/NavigationControls';
@@ -26,20 +26,28 @@ async function sendMessage(command: string, data?: any): Promise<MessageResponse
 
 export default function SessionDetail({ sessionId, onBack }: SessionDetailProps) {
   const [session, setSession] = useState<Session | null>(null);
+  const [currentStep, setCurrentStep] = useState<RecordedStep | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [stepLoading, setStepLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadSession();
   }, [sessionId]);
 
+  useEffect(() => {
+    if (session && session.steps.length > 0) {
+      loadCurrentStep();
+    }
+  }, [currentStepIndex, session]);
+
   const loadSession = async () => {
     setLoading(true);
     setError(null);
 
-    console.log('[SessionDetail] Loading session:', sessionId);
-    const response = await sendMessage(COMMANDS.GET_SESSION, { sessionId });
+    console.log('[SessionDetail] Loading session metadata:', sessionId);
+    const response = await sendMessage(COMMANDS.GET_SESSION_METADATA, { sessionId });
     console.log('[SessionDetail] Response:', response);
 
     if (response.success && response.data) {
@@ -53,6 +61,27 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
     }
 
     setLoading(false);
+  };
+
+  const loadCurrentStep = async () => {
+    if (!session || !session.steps[currentStepIndex]) {
+      return;
+    }
+
+    setStepLoading(true);
+    const stepId = session.steps[currentStepIndex].id;
+
+    console.log('[SessionDetail] Loading step:', stepId);
+    const response = await sendMessage(COMMANDS.GET_STEP, { sessionId, stepId });
+
+    if (response.success && response.data) {
+      console.log('[SessionDetail] Step loaded');
+      setCurrentStep(response.data);
+    } else {
+      console.error('[SessionDetail] Error loading step:', response.error);
+    }
+
+    setStepLoading(false);
   };
 
   const formatDate = (timestamp: number) => {
@@ -120,7 +149,6 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
     );
   }
 
-  const currentStep = session.steps[currentStepIndex];
   const canGoPrevious = currentStepIndex > 0;
   const canGoNext = currentStepIndex < session.steps.length - 1;
 
@@ -185,10 +213,19 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
 
             {/* Screenshot Viewer - Flexible height */}
             <div className="flex-1 min-h-0 mb-4">
-              <ScreenshotViewer
-                visual={currentStep.visual}
-                stepNumber={currentStepIndex + 1}
-              />
+              {stepLoading || !currentStep ? (
+                <div className="h-full bg-white rounded-xl shadow-sm border border-gray-200 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <p className="mt-4 text-gray-600">Loading screenshot...</p>
+                  </div>
+                </div>
+              ) : (
+                <ScreenshotViewer
+                  visual={currentStep.visual}
+                  stepNumber={currentStepIndex + 1}
+                />
+              )}
             </div>
 
             {/* Navigation Controls - Fixed at bottom */}
@@ -206,10 +243,17 @@ export default function SessionDetail({ sessionId, onBack }: SessionDetailProps)
 
           {/* Right Column: Step Details Panel */}
           <div className="w-80 flex-shrink-0 overflow-y-auto">
-            <StepDetailsPanel
-              step={currentStep}
-              stepNumber={currentStepIndex + 1}
-            />
+            {currentStep ? (
+              <StepDetailsPanel
+                step={currentStep}
+                stepNumber={currentStepIndex + 1}
+              />
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p className="mt-4 text-gray-600 text-sm">Loading details...</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

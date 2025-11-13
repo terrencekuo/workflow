@@ -19,6 +19,8 @@ export const COMMANDS = {
 
   // Session commands
   GET_SESSION: 'get_session',
+  GET_SESSION_METADATA: 'get_session_metadata',
+  GET_STEP: 'get_step',
   GET_ALL_SESSIONS: 'get_all_sessions',
   GET_SESSION_COUNT: 'get_session_count',
   GET_SESSION_IDS: 'get_session_ids',

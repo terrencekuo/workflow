@@ -104,6 +104,62 @@ messageBroker.on(COMMANDS.GET_SESSION, async (data: { sessionId: string }): Prom
   }
 });
 
+messageBroker.on(COMMANDS.GET_SESSION_METADATA, async (data: { sessionId: string }): Promise<MessageResponse> => {
+  try {
+    console.log('[Background] GET_SESSION_METADATA called for:', data.sessionId);
+    const session = await db.getSession(data.sessionId);
+    if (!session) {
+      console.log('[Background] Session not found:', data.sessionId);
+      return { success: false, error: 'Session not found' };
+    }
+
+    // Return session with thumbnails but without full viewport screenshots
+    const sessionMetadata = {
+      ...session,
+      steps: session.steps.map(step => ({
+        ...step,
+        visual: step.visual ? {
+          thumbnail: step.visual.thumbnail, // Keep thumbnail for sidebar
+          viewport: undefined, // Remove large viewport screenshot
+          annotated: undefined,
+        } : undefined,
+      })),
+    };
+
+    console.log('[Background] Session metadata loaded with', session.steps.length, 'steps');
+    return { success: true, data: sessionMetadata };
+  } catch (error) {
+    console.error('[Background] Error getting session metadata:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get session metadata',
+    };
+  }
+});
+
+messageBroker.on(COMMANDS.GET_STEP, async (data: { sessionId: string; stepId: string }): Promise<MessageResponse> => {
+  try {
+    console.log('[Background] GET_STEP called for:', data.stepId);
+    const session = await db.getSession(data.sessionId);
+    if (!session) {
+      return { success: false, error: 'Session not found' };
+    }
+
+    const step = session.steps.find(s => s.id === data.stepId);
+    if (!step) {
+      return { success: false, error: 'Step not found' };
+    }
+
+    return { success: true, data: step };
+  } catch (error) {
+    console.error('[Background] Error getting step:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get step',
+    };
+  }
+});
+
 messageBroker.on(COMMANDS.DELETE_SESSION, async (data: { sessionId: string }): Promise<MessageResponse> => {
   try {
     await db.deleteSession(data.sessionId);
