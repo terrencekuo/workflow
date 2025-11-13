@@ -3,21 +3,26 @@ import { COMMANDS } from '@/shared/constants';
 import { MessageBroker } from '@/background/MessageBroker';
 import { RecordingStateManager } from '@/background/RecordingStateManager';
 import { StepRecorder } from '@/background/StepRecorder';
+import { ContinuousSnapshotManager } from '@/background/ContinuousSnapshotManager';
 
 export class TabController {
   private messageBroker: MessageBroker;
   private stateManager: RecordingStateManager;
   private stepRecorder: StepRecorder;
+  private continuousSnapshotManager: ContinuousSnapshotManager;
   private onRecordingStopCallback?: () => void;
+  private hasSeenInitialPageLoad = false;
 
   constructor(
     messageBroker: MessageBroker,
     stateManager: RecordingStateManager,
-    stepRecorder: StepRecorder
+    stepRecorder: StepRecorder,
+    continuousSnapshotManager: ContinuousSnapshotManager
   ) {
     this.messageBroker = messageBroker;
     this.stateManager = stateManager;
     this.stepRecorder = stepRecorder;
+    this.continuousSnapshotManager = continuousSnapshotManager;
     this.setupTabListeners();
   }
 
@@ -99,6 +104,16 @@ export class TabController {
           try {
             await this.stepRecorder.capturePageLoadStep(tabId, tab.url || '');
             console.log('[TabController] ✅ Page load handling complete');
+
+            // Start continuous capture for all page loads during recording
+            // (hasSeenInitialPageLoad is set to true in startRecordingInTab)
+            if (this.hasSeenInitialPageLoad) {
+              const sessionId = this.stateManager.getCurrentSessionId();
+              if (sessionId) {
+                console.log('[TabController] 🎬 Starting continuous snapshot capture...');
+                await this.continuousSnapshotManager.startContinuousCapture(tabId, sessionId);
+              }
+            }
           } catch (error) {
             console.error('[TabController] ❌ Error in capturePageLoadStep:', error);
           }
@@ -111,6 +126,10 @@ export class TabController {
       const currentTabId = this.stateManager.getCurrentTabId();
       if (tabId === currentTabId && this.stateManager.isCurrentlyRecording()) {
         console.warn('[TabController] Recording tab closed, stopping recording');
+
+        // Stop continuous capture if active
+        this.continuousSnapshotManager.stopContinuousCapture();
+
         if (this.onRecordingStopCallback) {
           this.onRecordingStopCallback();
         }
@@ -215,6 +234,10 @@ export class TabController {
    */
   async startRecordingInTab(tabId: number): Promise<void> {
     const sessionId = this.stateManager.getCurrentSessionId();
+
+    // Set flag to true immediately since initial screenshot is captured BEFORE startRecordingInTab
+    // All subsequent page loads should trigger continuous capture
+    this.hasSeenInitialPageLoad = true;
 
     // Ensure content script is loaded
     await this.ensureContentScriptLoaded(tabId);

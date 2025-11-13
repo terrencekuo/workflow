@@ -4,17 +4,21 @@ import { EVENT_TYPES } from '@/shared/constants';
 import type { RecordedStep, MessageResponse } from '@/shared/types';
 import { VisualCaptureService } from '@/background/VisualCaptureService';
 import { RecordingStateManager } from '@/background/RecordingStateManager';
+import { ContinuousSnapshotManager } from '@/background/ContinuousSnapshotManager';
 
 export class StepRecorder {
   private visualCaptureService: VisualCaptureService;
   private stateManager: RecordingStateManager;
+  private continuousSnapshotManager: ContinuousSnapshotManager;
 
   constructor(
     visualCaptureService: VisualCaptureService,
-    stateManager: RecordingStateManager
+    stateManager: RecordingStateManager,
+    continuousSnapshotManager: ContinuousSnapshotManager
   ) {
     this.visualCaptureService = visualCaptureService;
     this.stateManager = stateManager;
+    this.continuousSnapshotManager = continuousSnapshotManager;
   }
 
   /**
@@ -37,6 +41,15 @@ export class StepRecorder {
       if (!this.stateManager.isCurrentlyRecording() || !sessionId) {
         console.log('[StepRecorder] ⚠️ Not recording or no session');
         return { success: false, error: 'Not currently recording' };
+      }
+
+      // Stop continuous capture and retrieve windowed snapshots if active
+      const windowedSnapshots = this.continuousSnapshotManager.stopAndGetSnapshots();
+
+      // Store windowed snapshots before the current step
+      if (windowedSnapshots.firstWindow.length > 0 || windowedSnapshots.lastWindow.length > 0) {
+        console.log('[StepRecorder] 📦 Storing windowed snapshots from continuous capture');
+        await this.storeWindowedSnapshots(sessionId, windowedSnapshots);
       }
 
       // Ensure step has session ID
@@ -308,5 +321,44 @@ export class StepRecorder {
       result
     });
     return result;
+  }
+
+  /**
+   * Store windowed snapshots from continuous capture as separate steps
+   */
+  async storeWindowedSnapshots(
+    sessionId: string,
+    windowedSnapshots: import('@/shared/types').ContinuousSnapshotWindow
+  ): Promise<void> {
+    const allSnapshots = [
+      ...windowedSnapshots.firstWindow,
+      ...windowedSnapshots.lastWindow
+    ];
+
+    console.log('[StepRecorder] Storing', allSnapshots.length, 'continuous snapshots');
+
+    for (const snapshot of allSnapshots) {
+      const step: RecordedStep = {
+        id: crypto.randomUUID(),
+        sessionId: sessionId,
+        type: 'continuous_snapshot',
+        selector: 'window',
+        timestamp: snapshot.timestamp,
+        metadata: {
+          type: 'continuousSnapshot',
+          relativeTime: snapshot.relativeTime,
+          description: `Continuous snapshot at ${snapshot.relativeTime}ms after page load`,
+        },
+        visual: {
+          viewport: snapshot.dataUrl,
+          thumbnail: snapshot.dataUrl,
+        },
+      };
+
+      await db.addStep(sessionId, step);
+      await this.stateManager.incrementStepCount();
+    }
+
+    console.log('[StepRecorder] ✅ Stored all continuous snapshots');
   }
 }

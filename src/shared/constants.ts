@@ -79,6 +79,13 @@ export const TIMING = {
   PAGE_READINESS_FALLBACK_DELAY: 500,  // Fallback delay if page detection fails
 } as const;
 
+// Continuous screenshot capture configuration
+export const CONTINUOUS_CAPTURE = {
+  CAPTURE_INTERVAL: 500,              // 500ms between captures (rate limit compliant)
+  FIRST_WINDOW_DURATION: 2000,        // Keep first 2 seconds of screenshots
+  LAST_WINDOW_DURATION: 2000,         // Keep last 2 seconds of screenshots
+} as const;
+
 // Storage keys
 export const STORAGE_KEYS = {
   RECORDING_STATE: 'recording_state',

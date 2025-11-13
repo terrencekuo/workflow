@@ -11,7 +11,8 @@ export type StepType =
   | 'hover'
   | 'keypress'
   | 'focus'
-  | 'blur';
+  | 'blur'
+  | 'continuous_snapshot';
 
 export interface Viewport {
   width: number;
@@ -125,4 +126,16 @@ export interface RecordingState {
   sessionId: string | null;
   currentTabId: number | null;
   stepCount: number;
+}
+
+// Continuous snapshot types
+export interface CapturedSnapshot {
+  timestamp: number;           // Absolute timestamp (Date.now())
+  dataUrl: string;             // Base64 PNG data URL
+  relativeTime: number;        // ms since capture started
+}
+
+export interface ContinuousSnapshotWindow {
+  firstWindow: CapturedSnapshot[];   // First 2 seconds of snapshots
+  lastWindow: CapturedSnapshot[];    // Last 2 seconds of snapshots
 }

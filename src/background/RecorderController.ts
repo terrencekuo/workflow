@@ -11,20 +11,23 @@ import { VisualCaptureService } from '@/background/VisualCaptureService';
 import { RecordingStateManager } from '@/background/RecordingStateManager';
 import { StepRecorder } from '@/background/StepRecorder';
 import { TabController } from '@/background/TabController';
+import { ContinuousSnapshotManager } from '@/background/ContinuousSnapshotManager';
 
 export class RecorderController {
   private messageBroker: MessageBroker;
   private stateManager: RecordingStateManager;
   private stepRecorder: StepRecorder;
   private tabController: TabController;
+  private continuousSnapshotManager: ContinuousSnapshotManager;
 
   constructor(messageBroker: MessageBroker, visualCaptureService: VisualCaptureService) {
     this.messageBroker = messageBroker;
 
     // Initialize specialized modules
     this.stateManager = new RecordingStateManager();
-    this.stepRecorder = new StepRecorder(visualCaptureService, this.stateManager);
-    this.tabController = new TabController(messageBroker, this.stateManager, this.stepRecorder);
+    this.continuousSnapshotManager = new ContinuousSnapshotManager(visualCaptureService);
+    this.stepRecorder = new StepRecorder(visualCaptureService, this.stateManager, this.continuousSnapshotManager);
+    this.tabController = new TabController(messageBroker, this.stateManager, this.stepRecorder, this.continuousSnapshotManager);
 
     // Set callback for tab controller to stop recording when tab closes
     this.tabController.setRecordingStopCallback(() => this.stopRecording());
@@ -179,6 +182,16 @@ export class RecorderController {
   async stopRecording(): Promise<void> {
     if (!this.stateManager.isCurrentlyRecording()) {
       return;
+    }
+
+    // Stop continuous capture and retrieve any remaining windowed snapshots
+    const windowedSnapshots = this.continuousSnapshotManager.stopAndGetSnapshots();
+
+    // Store windowed snapshots if any exist
+    const sessionId = this.stateManager.getCurrentSessionId();
+    if (sessionId && (windowedSnapshots.firstWindow.length > 0 || windowedSnapshots.lastWindow.length > 0)) {
+      console.log('[RecorderController] 📦 Storing final windowed snapshots from continuous capture');
+      await this.stepRecorder.storeWindowedSnapshots(sessionId, windowedSnapshots);
     }
 
     // Stop recording in current tab
