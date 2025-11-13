@@ -361,4 +361,52 @@ export class StepRecorder {
 
     console.log('[StepRecorder] ✅ Stored all continuous snapshots');
   }
+
+  /**
+   * Capture final screenshot when stopping recording
+   */
+  async captureFinalScreenshot(tabId: number, sessionId: string): Promise<void> {
+    try {
+      console.log('[StepRecorder] 📸 Capturing final screenshot...');
+
+      // Get current tab info
+      const tab = await chrome.tabs.get(tabId);
+
+      // Capture screenshot
+      const screenshot = await this.visualCaptureService.captureTabScreenshot(tabId);
+
+      if (screenshot) {
+        // Create a final step
+        const finalStep: RecordedStep = {
+          id: crypto.randomUUID(),
+          sessionId: sessionId,
+          type: EVENT_TYPES.PAGE_LOAD,
+          selector: 'window',
+          value: tab.url || '',
+          url: tab.url || '',
+          timestamp: Date.now(),
+          metadata: {
+            type: 'finalScreenshot',
+            url: tab.url || '',
+            description: 'Final screenshot when recording stopped',
+          },
+          visual: {
+            viewport: screenshot,
+            thumbnail: screenshot,
+          },
+        };
+
+        // Save to database
+        await db.addStep(sessionId, finalStep);
+        await this.stateManager.incrementStepCount();
+
+        console.log('[StepRecorder] ✅ Final screenshot captured successfully');
+      } else {
+        console.warn('[StepRecorder] ⚠️ No final screenshot captured');
+      }
+    } catch (error) {
+      console.error('[StepRecorder] ❌ Error capturing final screenshot:', error);
+      // Don't fail the stop recording if final screenshot fails
+    }
+  }
 }

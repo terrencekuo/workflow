@@ -81,9 +81,9 @@ export const TIMING = {
 
 // Continuous screenshot capture configuration
 export const CONTINUOUS_CAPTURE = {
-  CAPTURE_INTERVAL: 500,              // 500ms between captures (rate limit compliant)
-  FIRST_WINDOW_DURATION: 2000,        // Keep first 2 seconds of screenshots
-  LAST_WINDOW_DURATION: 2000,         // Keep last 2 seconds of screenshots
+  CAPTURE_INTERVAL: 1000,             // 1000ms (1 second) between captures
+  FIRST_WINDOW_DURATION: 2000,        // Keep first 2 seconds of screenshots (2 screenshots)
+  LAST_WINDOW_DURATION: 2000,         // Keep last 2 seconds of screenshots (2 screenshots)
 } as const;
 
 // Storage keys

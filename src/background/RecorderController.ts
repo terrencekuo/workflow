@@ -184,14 +184,22 @@ export class RecorderController {
       return;
     }
 
+    const sessionId = this.stateManager.getCurrentSessionId();
+    const currentTabId = this.stateManager.getCurrentTabId();
+
     // Stop continuous capture and retrieve any remaining windowed snapshots
     const windowedSnapshots = this.continuousSnapshotManager.stopAndGetSnapshots();
 
     // Store windowed snapshots if any exist
-    const sessionId = this.stateManager.getCurrentSessionId();
     if (sessionId && (windowedSnapshots.firstWindow.length > 0 || windowedSnapshots.lastWindow.length > 0)) {
       console.log('[RecorderController] 📦 Storing final windowed snapshots from continuous capture');
       await this.stepRecorder.storeWindowedSnapshots(sessionId, windowedSnapshots);
+    }
+
+    // Capture final screenshot when stopping recording
+    if (sessionId && currentTabId) {
+      console.log('[RecorderController] 📸 Capturing final screenshot on stop');
+      await this.stepRecorder.captureFinalScreenshot(currentTabId, sessionId);
     }
 
     // Stop recording in current tab
